@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS scenarios (
   trigger_tag_id  TEXT REFERENCES tags (id) ON DELETE SET NULL,
   is_active       INTEGER NOT NULL DEFAULT 1,
   delivery_mode   TEXT NOT NULL DEFAULT 'relative' CHECK (delivery_mode IN ('relative', 'elapsed', 'absolute_time')),
+  line_account_id TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -244,6 +245,10 @@ CREATE TABLE IF NOT EXISTS line_accounts (
   name                   TEXT NOT NULL,
   channel_access_token   TEXT NOT NULL,
   channel_secret         TEXT NOT NULL,
+  login_channel_id       TEXT,
+  login_channel_secret   TEXT,
+  liff_id                TEXT,
+  token_expires_at       TEXT,
   is_active              INTEGER NOT NULL DEFAULT 1,
   country                TEXT,
   role                   TEXT,

@@ -164,7 +164,17 @@ webhook.post('/webhook', async (c) => {
   const processingPromise = (async () => {
     for (const event of body.events) {
       try {
-        await handleEvent(db, lineClient, event, channelAccessToken, matchedAccountId, c.env.WORKER_URL || new URL(c.req.url).origin, c.env.LIFF_URL, c.env.IMAGES);
+        await handleEvent(
+          db,
+          lineClient,
+          event,
+          channelAccessToken,
+          matchedAccountId,
+          c.env.WORKER_URL || new URL(c.req.url).origin,
+          c.env.LIFF_URL,
+          c.env.IMAGES,
+          { apiKey: c.env.OPENAI_API_KEY, model: c.env.OPENAI_MODEL },
+        );
       } catch (err) {
         console.error('Error handling webhook event:', err);
       }
@@ -185,6 +195,7 @@ async function handleEvent(
   workerUrl?: string,
   liffUrl?: string,
   r2?: R2Bucket,
+  moneyAi?: { apiKey?: string; model?: string },
 ): Promise<void> {
   if (event.type === 'follow') {
     const userId =
@@ -536,6 +547,13 @@ async function handleEvent(
     const incomingText = textMessage.text;
     const now = jstNow();
     const logId = crypto.randomUUID();
+    let pendingMoneyScoreEvent: import('../services/money-scoring.js').MoneyScoreEvent | null = null;
+    try {
+      const { moneyScoreEventForMenuText } = await import('../services/money-scoring.js');
+      pendingMoneyScoreEvent = moneyScoreEventForMenuText(incomingText);
+    } catch (err) {
+      console.error('Failed to resolve money score event', err);
+    }
 
     // 受信メッセージをログに記録
     await db
@@ -664,6 +682,42 @@ async function handleEvent(
 
         matched = true;
         break;
+      }
+    }
+
+    if (!matched) {
+      try {
+        const { generateMoneyAiReply } = await import('../services/money-ai-chat.js');
+        const aiReply = await generateMoneyAiReply(
+          { apiKey: moneyAi?.apiKey, model: moneyAi?.model },
+          { friend, incomingText },
+        );
+        if (aiReply) {
+          const replyMsg = buildMessage('text', aiReply);
+          await lineClient.replyMessage(event.replyToken, [replyMsg]);
+          replyTokenConsumed = true;
+          matched = true;
+          pendingMoneyScoreEvent = 'ai_chat_used';
+
+          await db
+            .prepare(
+              `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at)
+               VALUES (?, ?, 'outgoing', 'text', ?, NULL, NULL, 'reply', 'ai_chat', ?, ?)`,
+            )
+            .bind(crypto.randomUUID(), friend.id, aiReply, lineAccountId ?? null, jstNow())
+            .run();
+        }
+      } catch (err) {
+        console.error('Failed to send money AI reply', err);
+      }
+    }
+
+    if (pendingMoneyScoreEvent) {
+      try {
+        const { addMoneyScoreOnce } = await import('../services/money-scoring.js');
+        await addMoneyScoreOnce(db, friend.id, pendingMoneyScoreEvent);
+      } catch (err) {
+        console.error('Failed to apply money score', err);
       }
     }
 

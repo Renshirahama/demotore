@@ -31,6 +31,12 @@ const MONEY_DIAGNOSIS_TAGS = {
 
 type MoneyDiagnosisType = 'A' | 'B' | 'C';
 
+const MONEY_DIAGNOSIS_SCENARIOS: Record<MoneyDiagnosisType, string> = {
+  A: 'scenario-money-education-7day-type-a-v1',
+  B: 'scenario-money-education-7day-type-b-v1',
+  C: 'scenario-money-education-7day-type-c-v1',
+};
+
 function asStringValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(',');
   return value == null ? '' : String(value);
@@ -47,38 +53,48 @@ function classifyMoneyDiagnosis(data: Record<string, unknown>): {
   const experience = asStringValue(data.experience);
   const pain = asStringValue(data.pain);
 
-  if (pain.includes('損するのが怖い') || purpose.includes('その他')) {
+  if (
+    purpose.includes('AI研修') ||
+    pain.includes('AI人材') ||
+    pain.includes('開発人材') ||
+    experience.includes('課題はあるが未整理')
+  ) {
     return {
       type: 'C',
-      label: '個別最適化が必要な「個別相談推奨タイプ」',
+      label: '社内定着まで整える「AI研修・内製化支援タイプ」',
       tagId: MONEY_DIAGNOSIS_TAGS.typeC,
       summary:
-        '不安や前提条件を整理してから進めるほど成果につながりやすい状態です。一般論より、収支・目的・許容リスクに合わせた設計が重要です。',
+        'AI活用を一部の担当者だけで終わらせず、現場で使える状態にする支援が向いています。研修、運用ルール、伴走支援をセットで整理すると進めやすい状態です。',
       nextAction:
-        'まずは無料個別カウンセリングで、今の状況に合う学習順序と資産形成プランを確認しましょう。',
+        'まずは現在の業務課題と社内体制を整理し、AI研修・定着支援の進め方を確認しましょう。',
     };
   }
 
-  if (experience.includes('実際に運用中') || experience.includes('少し知識がある')) {
+  if (
+    purpose.includes('開発') ||
+    purpose.includes('実装') ||
+    experience.includes('具体的に検討中') ||
+    experience.includes('予算あり')
+  ) {
     return {
       type: 'B',
-      label: '資産形成の加速を目指す「実践準備タイプ」',
+      label: '形にする相談が向いている「AI開発・実装相談タイプ」',
       tagId: MONEY_DIAGNOSIS_TAGS.typeB,
       summary:
-        '基礎理解はでき始めています。次は、目的に合う運用方針・リスク管理・継続ルールを固める段階です。',
+        '課題や作りたいものが見え始めています。次は、要件整理、PoC、実装範囲、運用設計を具体化する段階です。',
       nextAction:
-        '講義とワークで判断基準を整え、Day5の案内で個別カウンセリングの活用可否を判断してください。',
+        '配信で進め方を確認し、必要なら「開発相談をしたい」と送ってください。担当者がヒアリングへ進めます。',
     };
   }
 
   return {
     type: 'A',
-    label: '基礎から学ぶ「マネー初心者タイプ」',
+    label: 'まず方向性を整理する「AI活用検討タイプ」',
     tagId: MONEY_DIAGNOSIS_TAGS.typeA,
     summary:
-      '最初にやるべきことを順番に整理すれば、無理なく学習を始められる状態です。専門用語より、家計・貯蓄・リスクの基礎から進めましょう。',
+      'AIやDXに関心はあるものの、最初に何を相談すべきかを整理する段階です。自社課題、活用領域、導入効果の見立てから始めると進めやすくなります。',
     nextAction:
-      'Day1からの講義で、お金の勉強が必要な理由と最初の一歩を確認してください。',
+      'Day1からの配信で、AI導入の考え方と相談前に整理するポイントを確認してください。',
   };
 }
 
@@ -93,7 +109,7 @@ function buildMoneyDiagnosisFlex(
       type: 'box',
       layout: 'vertical',
       contents: [
-        { type: 'text', text: '診断結果', size: 'sm', color: '#0f766e', weight: 'bold' },
+        { type: 'text', text: '相談タイプ診断結果', size: 'sm', color: '#0f766e', weight: 'bold' },
         { type: 'text', text: diagnosis.label, size: 'lg', color: '#111827', weight: 'bold', wrap: true, margin: 'sm' },
       ],
       paddingAll: '20px',
@@ -105,7 +121,7 @@ function buildMoneyDiagnosisFlex(
       contents: [
         {
           type: 'text',
-          text: `${displayName || 'あなた'}さんの回答から、現在の学習ステージを判定しました。`,
+          text: `${displayName || 'あなた'}さんの回答から、現在の相談タイプを判定しました。`,
           size: 'sm',
           color: '#374151',
           wrap: true,
@@ -604,7 +620,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
       }
 
       // Enroll in scenario
-      if (form.on_submit_scenario_id) {
+      if (form.on_submit_scenario_id && form.id !== MONEY_DIAGNOSIS_FORM_ID) {
         sideEffects.push(enrollFriendInScenario(db, friendId, form.on_submit_scenario_id));
       }
 
@@ -614,6 +630,9 @@ forms.post('/api/forms/:id/submit', async (c) => {
             const diagnosis = classifyMoneyDiagnosis(submissionData);
             await addTagToFriend(db, friendId, MONEY_DIAGNOSIS_TAGS.completed);
             await addTagToFriend(db, friendId, diagnosis.tagId);
+            await enrollFriendInScenario(db, friendId, MONEY_DIAGNOSIS_SCENARIOS[diagnosis.type]);
+            const { addMoneyScoreOnce, moneyScoreEventForDiagnosisType } = await import('../services/money-scoring.js');
+            await addMoneyScoreOnce(db, friendId, moneyScoreEventForDiagnosisType(diagnosis.type));
 
             const friend = await getFriendById(db, friendId!);
             if (!friend) return;
