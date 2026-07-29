@@ -9,6 +9,7 @@ export type RichMenuTemplate = {
   label: string;
   size: 'large' | 'compact';
   description?: string;
+  imagePath?: string;
   areas: { x: number; y: number; w: number; h: number }[];
 };
 
@@ -61,6 +62,40 @@ export const TEMPLATES: RichMenuTemplate[] = [
       { x: 0, y: 0, w: LARGE.width, h: LARGE.height / 2 },
       { x: 0, y: LARGE.height / 2, w: LARGE.width / 2, h: LARGE.height / 2 },
       { x: LARGE.width / 2, y: LARGE.height / 2, w: LARGE.width / 2, h: LARGE.height / 2 },
+    ],
+  },
+  {
+    key: 'money-before',
+    label: '相談前メニュー (画像つき)',
+    size: 'large',
+    description: '診断とサービス確認の 2 ボタン',
+    imagePath: '/rich-menu-presets/money-before.png',
+    areas: [
+      { x: 0, y: 0, w: LARGE.width, h: LARGE.height / 2 },
+      { x: 0, y: LARGE.height / 2, w: LARGE.width, h: LARGE.height / 2 },
+    ],
+  },
+  {
+    key: 'money-learning',
+    label: '案内中メニュー (画像つき)',
+    size: 'large',
+    description: '導入事例・資料請求・相談内容の 3 ボタン',
+    imagePath: '/rich-menu-presets/money-learning.png',
+    areas: [
+      { x: 0, y: 0, w: LARGE.width / 2, h: LARGE.height / 2 },
+      { x: LARGE.width / 2, y: 0, w: LARGE.width / 2, h: LARGE.height / 2 },
+      { x: 0, y: LARGE.height / 2, w: LARGE.width, h: LARGE.height / 2 },
+    ],
+  },
+  {
+    key: 'money-counseling',
+    label: '問い合わせメニュー (画像つき)',
+    size: 'large',
+    description: '開発相談と FAQ の 2 ボタン',
+    imagePath: '/rich-menu-presets/money-counseling.png',
+    areas: [
+      { x: 0, y: 0, w: LARGE.width, h: LARGE.height / 2 },
+      { x: 0, y: LARGE.height / 2, w: LARGE.width, h: LARGE.height / 2 },
     ],
   },
   {

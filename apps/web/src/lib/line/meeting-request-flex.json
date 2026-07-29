@@ -1,0 +1,63 @@
+{
+  "type": "flex",
+  "altText": "面談依頼が届きました",
+  "contents": {
+    "type": "bubble",
+    "size": "mega",
+    "body": {
+      "type": "box",
+      "layout": "vertical",
+      "backgroundColor": "#1A1A2E",
+      "paddingAll": "20px",
+      "spacing": "md",
+      "contents": [
+        {
+          "type": "text",
+          "text": "REBNISE Sponsor Connect",
+          "size": "xs",
+          "color": "#C4A35A",
+          "weight": "bold"
+        },
+        {
+          "type": "text",
+          "text": "面談依頼が届きました",
+          "size": "lg",
+          "color": "#FFFFFF",
+          "weight": "bold",
+          "wrap": true
+        },
+        {
+          "type": "separator",
+          "color": "#C4A35A",
+          "margin": "md"
+        },
+        {
+          "type": "text",
+          "text": "スポンサー企業様より新しい面談依頼が届いています。内容をご確認のうえ、ご対応をお願いいたします。",
+          "size": "sm",
+          "color": "#E8E8EE",
+          "wrap": true,
+          "margin": "md"
+        }
+      ]
+    },
+    "footer": {
+      "type": "box",
+      "layout": "vertical",
+      "backgroundColor": "#1A1A2E",
+      "paddingAll": "16px",
+      "contents": [
+        {
+          "type": "button",
+          "style": "primary",
+          "color": "#C4A35A",
+          "action": {
+            "type": "uri",
+            "label": "詳細を確認する",
+            "uri": "https://example.com/sponsor/meetings"
+          }
+        }
+      ]
+    }
+  }
+}

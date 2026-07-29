@@ -21,7 +21,7 @@ const buildSha =
 const buildTime = process.env.APP_BUILD_TIME || new Date().toISOString()
 
 const nextConfig: NextConfig = {
-  output: 'export',
+  ...(process.env.NEXT_OUTPUT_EXPORT === 'true' ? { output: 'export' as const } : {}),
   transpilePackages: ['@line-crm/shared'],
   env: {
     APP_VERSION: pkg.version,

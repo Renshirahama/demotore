@@ -7,6 +7,7 @@ import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties } from '@/components/rich-menus/area-properties'
+import { TEMPLATES } from '@/lib/rich-menu-templates'
 
 type Page = {
   id: string
@@ -36,6 +37,8 @@ const SIZE_LABEL: Record<Group['size'], string> = {
   large: '2500×1686',
   compact: '2500×843',
 }
+
+const IMAGE_TEMPLATES = TEMPLATES.filter((t) => t.imagePath)
 
 export default function RichMenuEditPage() {
   return (
@@ -346,6 +349,31 @@ function Editor({
     }
   }
 
+  async function handlePresetImage(pageId: string, imagePath: string, key: string) {
+    if (pageId.startsWith('tmp-')) {
+      alert('まず Save Draft でページを保存してからプリセット画像を適用してください。')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const imageRes = await fetch(imagePath)
+      if (!imageRes.ok) throw new Error('プリセット画像の読み込みに失敗しました')
+      const blob = await imageRes.blob()
+      const file = new File([blob], `${key}.png`, { type: 'image/png' })
+      const res = await api.richMenuGroups.uploadImage(groupId, pageId, file)
+      updatePage(pageId, {
+        imageR2Key: res.data.imageR2Key,
+        imageContentType: res.data.imageContentType,
+      })
+      setImageVersion((v) => v + 1)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading) {
     return (
       <main className="p-6 max-w-7xl mx-auto">
@@ -567,6 +595,35 @@ function Editor({
                   </p>
                 )}
               </div>
+              {group.size === 'large' && IMAGE_TEMPLATES.length > 0 && (
+                <div className="pt-4 border-t border-gray-100">
+                  <div className="text-xs font-medium text-gray-600 mb-2">
+                    プリセット画像
+                  </div>
+                  <div className="space-y-2">
+                    {IMAGE_TEMPLATES.map((t) => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => handlePresetImage(activePage.id, t.imagePath!, t.key)}
+                        disabled={busy || activePage.id.startsWith('tmp-')}
+                        className="w-full text-left border border-gray-200 rounded-lg overflow-hidden hover:border-green-400 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={t.imagePath}
+                          alt=""
+                          className="w-full object-cover"
+                          style={{ aspectRatio: '2500 / 1686' }}
+                        />
+                        <span className="block px-3 py-2 text-xs font-medium text-gray-700">
+                          {t.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <p className="text-[11px] text-gray-400 pt-3 border-t border-gray-100">
                 中央のキャンバスでドラッグして tap 領域 (areas) を追加・編集できます。
               </p>

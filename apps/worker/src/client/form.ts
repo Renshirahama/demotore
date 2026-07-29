@@ -80,6 +80,18 @@ const state: FormState = {
 // Replier pool loading state (shared between renderFormPage and attachXAutocomplete)
 let _replierPoolReady = false;
 
+function hasLiffId(): boolean {
+  return Boolean(new URLSearchParams(window.location.search).get('liffId'));
+}
+
+function isInLineClient(): boolean {
+  try {
+    return hasLiffId() && typeof liff !== 'undefined' && liff.isInClient();
+  } catch {
+    return false;
+  }
+}
+
 function escapeHtml(str: string): string {
   const div = document.createElement('div');
   div.textContent = str;
@@ -581,7 +593,7 @@ function renderWebhookSuccess(message: string): void {
   `;
 
   document.getElementById('closeBtn')?.addEventListener('click', () => {
-    if (liff.isInClient()) {
+    if (isInLineClient()) {
       liff.closeWindow();
     } else {
       window.close();
@@ -603,7 +615,7 @@ function renderSuccess(): void {
   `;
 
   document.getElementById('closeBtn')?.addEventListener('click', () => {
-    if (liff.isInClient()) {
+    if (isInLineClient()) {
       liff.closeWindow();
     } else {
       window.close();
@@ -611,7 +623,7 @@ function renderSuccess(): void {
   });
 
   // Auto-close after 3s inside LINE
-  if (liff.isInClient()) {
+  if (isInLineClient()) {
     setTimeout(() => {
       try { liff.closeWindow(); } catch { /* ignore */ }
     }, 3000);
@@ -1168,8 +1180,9 @@ export async function initForm(formId: string | null): Promise<void> {
 
   try {
     // Fetch profile and form definition in parallel
+    const shouldUseLiff = hasLiffId();
     const [profile, res] = await Promise.all([
-      liff.getProfile(),
+      shouldUseLiff ? liff.getProfile().catch(() => null) : Promise.resolve(null),
       apiCall(`/api/forms/${formId}`),
     ]);
 
@@ -1183,8 +1196,8 @@ export async function initForm(formId: string | null): Promise<void> {
     }
 
     // Silent UUID linking (best-effort, so friend metadata saves correctly)
-    const rawIdToken = liff.getIDToken();
-    if (rawIdToken) {
+    const rawIdToken = shouldUseLiff ? liff.getIDToken() : null;
+    if (rawIdToken && profile) {
       apiCall('/api/liff/link', {
         method: 'POST',
         body: JSON.stringify({
@@ -1259,4 +1272,3 @@ export async function initForm(formId: string | null): Promise<void> {
     renderFormError(err instanceof Error ? err.message : 'エラーが発生しました');
   }
 }
-

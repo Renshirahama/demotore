@@ -19,6 +19,13 @@ export default function NewRichMenuPage() {
 
   const tmpl = TEMPLATES.find((t) => t.key === templateKey) ?? TEMPLATES[0]
 
+  async function fetchPresetFile(imagePath: string, name: string): Promise<File> {
+    const res = await fetch(imagePath)
+    if (!res.ok) throw new Error('プリセット画像の読み込みに失敗しました')
+    const blob = await res.blob()
+    return new File([blob], `${name}.png`, { type: 'image/png' })
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedAccount) {
@@ -42,6 +49,11 @@ export default function NewRichMenuPage() {
         ],
       })
       if (!res.success) throw new Error(res.error ?? '作成失敗')
+      const firstPageId = res.data.pages[0]?.id
+      if (tmpl.imagePath && firstPageId) {
+        const file = await fetchPresetFile(tmpl.imagePath, tmpl.key)
+        await api.richMenuGroups.uploadImage(res.data.id, firstPageId, file)
+      }
       router.push(`/rich-menus/edit?id=${res.data.id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -123,6 +135,17 @@ export default function NewRichMenuPage() {
                   </div>
                   {t.description && (
                     <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>
+                  )}
+                  {t.imagePath && (
+                    <div className="mt-2 overflow-hidden rounded border border-gray-200 bg-white">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={t.imagePath}
+                        alt=""
+                        className="w-full object-cover"
+                        style={{ aspectRatio: '2500 / 1686' }}
+                      />
+                    </div>
                   )}
                 </div>
               </label>

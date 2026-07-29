@@ -17,12 +17,13 @@ import {
   computeNextDeliveryAt,
   resolveStepContent,
   addTagToFriend,
+  getFriendTags,
   getEntryRouteByRefCode,
   getMessageTemplateById,
 } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
-import { buildMessage, expandVariables } from '../services/step-delivery.js';
+import { buildMessage, expandVariables, resolveMetadata } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
 
 const webhook = new Hono<Env>();
@@ -71,6 +72,41 @@ async function ensureFriendFromWebhookUser(
   }
 
   return friend;
+}
+
+function pickString(meta: Record<string, unknown>, keys: string[], fallback = ''): string {
+  for (const key of keys) {
+    const value = meta[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return fallback;
+}
+
+function sponsorRankFromTags(tags: Array<{ name: string }>): string {
+  const names = tags.map((tag) => tag.name);
+  if (names.includes('スポンサー_ダイヤモンド')) return 'ダイヤモンド';
+  if (names.includes('スポンサー_ゴールド')) return 'ゴールド';
+  if (names.includes('スポンサー_シルバー')) return 'シルバー';
+  return '未設定';
+}
+
+async function resolveSponsorMetadata(
+  db: D1Database,
+  friend: Friend,
+): Promise<Record<string, unknown>> {
+  const base = await resolveMetadata(db, {
+    user_id: (friend as unknown as Record<string, string | null>).user_id,
+    metadata: (friend as unknown as Record<string, string | null>).metadata,
+  });
+  const tags = await getFriendTags(db, friend.id).catch(() => []);
+  return {
+    ...base,
+    sponsor_company: pickString(base, ['company', 'company_name', '貴社名'], '未登録'),
+    sponsor_contact_name: pickString(base, ['name', 'applicant_name', 'contact_name', 'ご担当者様お名前'], friend.display_name ?? ''),
+    sponsor_rank: sponsorRankFromTags(tags),
+    sponsor_member_id: friend.id,
+    sponsor_season: pickString(base, ['sponsor_season', 'season'], '2026-27'),
+  };
 }
 
 webhook.post('/webhook', async (c) => {
@@ -434,8 +470,7 @@ async function handleEvent(
 
       if (isMatch) {
         try {
-          const { resolveMetadata } = await import('../services/step-delivery.js');
-          const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
+          const resolvedMeta = await resolveSponsorMetadata(db, friend);
           const resolved = await resolveAutoReplyContent(db, {
             template_id: rule.template_id,
             response_type: rule.response_type,
@@ -651,8 +686,7 @@ async function handleEvent(
         }
 
         try {
-          const { resolveMetadata: resolveMeta2 } = await import('../services/step-delivery.js');
-          const resolvedMeta2 = await resolveMeta2(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
+          const resolvedMeta2 = await resolveSponsorMetadata(db, friend);
           const resolved = await resolveAutoReplyContent(db, {
             template_id: rule.template_id,
             response_type: rule.response_type,

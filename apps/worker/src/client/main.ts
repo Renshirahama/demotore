@@ -40,9 +40,6 @@ function detectLiffId(): string {
   return import.meta.env?.VITE_LIFF_ID || '';
 }
 const LIFF_ID = detectLiffId();
-if (!LIFF_ID) {
-  throw new Error('LIFF ID not found. Set ?liffId= in LIFF endpoint URL or VITE_LIFF_ID env.');
-}
 const UUID_STORAGE_KEY = 'lh_uuid';
 // Bot basic ID — resolved dynamically from API after liff.init()
 let BOT_BASIC_ID = '';
@@ -564,6 +561,18 @@ async function initAffiliate(): Promise<void> {
 
 async function main() {
   try {
+    const page = getPage();
+
+    if (!LIFF_ID) {
+      if (page === 'form') {
+        const params = new URLSearchParams(window.location.search);
+        const formId = params.get('id');
+        await initForm(formId);
+        return;
+      }
+      throw new Error('LIFF ID not found. Set ?liffId= in LIFF endpoint URL or VITE_LIFF_ID env.');
+    }
+
     await liff.init({ liffId: LIFF_ID });
 
     if (!liff.isLoggedIn()) {
@@ -582,7 +591,6 @@ async function main() {
       // fallback: BOT_BASIC_ID remains empty, friend-add URL won't auto-redirect
     }
 
-    const page = getPage();
     if (page === 'book') {
       await initBooking();
     } else if (page === 'salon-book') {
