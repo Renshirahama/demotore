@@ -14,6 +14,7 @@ import {
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
+import { parseFriendMetadata } from '../lib/friend-metadata.js';
 import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
 
 /**
@@ -44,9 +45,7 @@ export function expandVariables(
     result = result.replace(/\{\{#if_ref\}\}[\s\S]*?\{\{\/if_ref\}\}/g, '');
   }
   // Metadata variables: {{metadata.KEY}} → value from friend's metadata
-  const meta = friend.metadata
-    ? (typeof friend.metadata === 'string' ? JSON.parse(friend.metadata) as Record<string, unknown> : friend.metadata)
-    : {};
+  const meta = parseFriendMetadata(friend.metadata);
   // Conditional block: {{#if_metadata.KEY}}...{{/if_metadata.KEY}} — only shown if metadata key has a value
   // When inside JSON arrays, removes the element and fixes trailing/leading commas
   result = result.replace(/\{\{#if_metadata\.([^}]+)\}\}([\s\S]*?)\{\{\/if_metadata\.\1\}\}/g, (_match, key, inner) => {
@@ -92,7 +91,7 @@ export async function resolveMetadata(
   }
   // Fallback: parse own metadata
   if (friend.metadata) {
-    try { return JSON.parse(friend.metadata); } catch { return {}; }
+    return parseFriendMetadata(friend.metadata);
   }
   return {};
 }
@@ -382,7 +381,7 @@ export async function evaluateCondition(
         .first<{ metadata: string }>();
       let metadata: Record<string, unknown> = {};
       try {
-        metadata = JSON.parse(friend?.metadata || '{}') as Record<string, unknown>;
+        metadata = parseFriendMetadata(friend?.metadata);
       } catch {
         // Friend metadata corruption shouldn't propagate; treat as empty map.
         metadata = {};

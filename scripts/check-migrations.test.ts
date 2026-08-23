@@ -52,6 +52,26 @@ describe('checkMigration', () => {
     if (!result.ok) expect(result.violation).toMatch(/RENAME/i);
   });
 
+  it('allows the account-scope friends table rebuild escape hatch only for its known table operations', () => {
+    const sql = `
+      -- line-harness-allow: rebuild-friends-account-scope
+      ALTER TABLE friends RENAME TO friends_line_user_id_unique_old;
+      CREATE TABLE friends (id TEXT PRIMARY KEY, line_user_id TEXT NOT NULL);
+      DROP TABLE friends_line_user_id_unique_old;
+    `;
+    expect(checkMigration(sql)).toEqual({ ok: true });
+  });
+
+  it('does not make the friends rebuild escape hatch allow unrelated drops', () => {
+    const sql = `
+      -- line-harness-allow: rebuild-friends-account-scope
+      DROP TABLE broadcasts;
+    `;
+    const result = checkMigration(sql);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.violation).toMatch(/DROP TABLE/i);
+  });
+
   it('blocks RENAME COLUMN', () => {
     const sql = `ALTER TABLE foo RENAME COLUMN old_name TO new_name;`;
     const result = checkMigration(sql);

@@ -34,7 +34,8 @@ interface BookingState {
   slots: Slot[];
   selectedSlot: Slot | null;
   profile: { userId: string; displayName: string; pictureUrl?: string } | null;
-  friendId: string | null;
+  idToken: string | null;
+  userUuid: string | null;
   loading: boolean;
   submitting: boolean;
 }
@@ -46,7 +47,8 @@ const state: BookingState = {
   slots: [],
   selectedSlot: null,
   profile: null,
-  friendId: null,
+  idToken: null,
+  userUuid: null,
   loading: false,
   submitting: false,
 };
@@ -62,6 +64,7 @@ function apiCall(path: string, options?: RequestInit): Promise<Response> {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(state.idToken ? { Authorization: `Bearer ${state.idToken}` } : {}),
       ...options?.headers,
     },
   });
@@ -382,7 +385,7 @@ async function fetchSlots(date: string): Promise<void> {
 }
 
 async function submitBooking(): Promise<void> {
-  const { selectedSlot, selectedDate, profile, friendId } = state;
+  const { selectedSlot, selectedDate, profile } = state;
   if (!selectedSlot || !selectedDate || !profile || state.submitting) return;
   state.submitting = true;
 
@@ -399,7 +402,6 @@ async function submitBooking(): Promise<void> {
       endAt: selectedSlot.endAt,
     };
     if (CONNECTION_ID) body.connectionId = CONNECTION_ID;
-    if (friendId) body.friendId = friendId;
 
     const res = await apiCall('/api/integrations/google-calendar/book', {
       method: 'POST',
@@ -427,15 +429,16 @@ export async function initBooking(): Promise<void> {
   // Try to get friendId from UUID linking
   const UUID_STORAGE_KEY = 'lh_uuid';
   try {
-    state.friendId = localStorage.getItem(UUID_STORAGE_KEY);
+    state.userUuid = localStorage.getItem(UUID_STORAGE_KEY);
   } catch {
     // silent
   }
 
   // Silent UUID linking (same as main flow)
   const rawIdToken = liff.getIDToken();
+  state.idToken = rawIdToken;
   if (rawIdToken) {
-    const existingUuid = state.friendId;
+    const existingUuid = state.userUuid;
     apiCall('/api/liff/link', {
       method: 'POST',
       body: JSON.stringify({
@@ -449,7 +452,7 @@ export async function initBooking(): Promise<void> {
         if (data?.data?.userId) {
           try {
             localStorage.setItem(UUID_STORAGE_KEY, data.data.userId);
-            state.friendId = data.data.userId;
+            state.userUuid = data.data.userId;
           } catch { /* silent */ }
         }
       }

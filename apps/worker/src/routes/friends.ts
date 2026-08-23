@@ -11,6 +11,7 @@ import {
   jstNow,
 } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
+import { mergeFriendMetadata, parseFriendMetadata } from '../lib/friend-metadata.js';
 import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
@@ -34,7 +35,7 @@ function serializeFriend(row: DbFriend) {
     pictureUrl: row.picture_url,
     statusMessage: row.status_message,
     isFollowing: Boolean(row.is_following),
-    metadata: JSON.parse(row.metadata || '{}'),
+    metadata: parseFriendMetadata(row.metadata),
     refCode: (row as unknown as Record<string, unknown>).ref_code as string | null,
     lineAccountId: ((row as unknown as Record<string, unknown>).line_account_id as string | null) ?? null,
     userId: row.user_id,
@@ -485,8 +486,7 @@ friends.put('/api/friends/:id/metadata', async (c) => {
     }
 
     const body = await c.req.json<Record<string, unknown>>();
-    const existing = JSON.parse(friend.metadata || '{}');
-    const merged = { ...existing, ...body };
+    const merged = mergeFriendMetadata(friend.metadata, body);
     const now = jstNow();
 
     await db

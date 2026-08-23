@@ -111,8 +111,17 @@ function stripLineComments(sql: string): string {
     .join('\n');
 }
 
+function applyAllowlistedRebuilds(sql: string, stripped: string): string {
+  if (!/--\s*line-harness-allow:\s*rebuild-friends-account-scope/i.test(sql)) {
+    return stripped;
+  }
+  return stripped
+    .replace(/\bALTER\s+TABLE\s+friends\s+RENAME\s+TO\s+friends_line_user_id_unique_old\b/gi, '')
+    .replace(/\bDROP\s+TABLE\s+friends_line_user_id_unique_old\b/gi, '');
+}
+
 export function checkMigration(sql: string): CheckResult {
-  const stripped = stripLineComments(sql);
+  const stripped = applyAllowlistedRebuilds(sql, stripLineComments(sql));
   for (const rule of RULES) {
     const m = stripped.match(rule.pattern);
     if (m) {

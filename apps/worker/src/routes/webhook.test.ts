@@ -270,6 +270,7 @@ describe('POST /webhook — first-contact existing friends', () => {
     expect(lineClientMocks.getProfile).toHaveBeenCalledWith('U-existing');
     expect(upsertFriend).toHaveBeenCalledWith(db, {
       lineUserId: 'U-existing',
+      lineAccountId: null,
       displayName: 'Existing Friend',
       pictureUrl: 'https://example.com/profile.jpg',
       statusMessage: 'hello',

@@ -64,6 +64,23 @@ function readSchemaObjects(db: Database.Database) {
 }
 
 describe('bootstrap.sql', () => {
+  it('keeps the direct schema friends table compatible with current code', () => {
+    const db = new Database(':memory:');
+    db.exec(readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
+
+    const columns = db
+      .prepare(`PRAGMA table_info(friends)`)
+      .all() as Array<{ name: string }>;
+    expect(columns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        'ref_code',
+        'metadata',
+        'line_account_id',
+        'first_tracked_link_id',
+      ]),
+    );
+  });
+
   it('stays in sync with schema.sql + migrations', () => {
     expect(() =>
       execFileSync('node', [GENERATOR, '--check'], {

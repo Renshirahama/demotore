@@ -58,7 +58,7 @@ export async function getFriends(
  *
  * - tagId が省略された場合は account 内全員の following を返す
  * - line_user_id は LINE bulk link API の userIds に直接渡す形式 (U... 始まり)
- * - 重複は無いはず (friends.line_user_id は UNIQUE)
+ * - 同一 account 内での重複は無いはず
  */
 export async function getFollowingLineUserIdsByTag(
   db: D1Database,
@@ -93,9 +93,27 @@ export async function getFollowingLineUserIdsByTag(
 export async function getFriendByLineUserId(
   db: D1Database,
   lineUserId: string,
+  options: { lineAccountId?: string | null } = {},
 ): Promise<Friend | null> {
+  if ('lineAccountId' in options) {
+    if (options.lineAccountId === null) {
+      return db
+        .prepare(`SELECT * FROM friends WHERE line_user_id = ? AND line_account_id IS NULL`)
+        .bind(lineUserId)
+        .first<Friend>();
+    }
+    return db
+      .prepare(`SELECT * FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
+      .bind(lineUserId, options.lineAccountId)
+      .first<Friend>();
+  }
   return db
-    .prepare(`SELECT * FROM friends WHERE line_user_id = ?`)
+    .prepare(
+      `SELECT * FROM friends
+       WHERE line_user_id = ?
+       ORDER BY line_account_id IS NULL ASC, updated_at DESC
+       LIMIT 1`,
+    )
     .bind(lineUserId)
     .first<Friend>();
 }
@@ -136,6 +154,7 @@ export async function setFriendFirstTrackedLinkIfNull(
 
 export interface UpsertFriendInput {
   lineUserId: string;
+  lineAccountId?: string | null;
   displayName?: string | null;
   pictureUrl?: string | null;
   statusMessage?: string | null;
@@ -146,7 +165,21 @@ export async function upsertFriend(
   input: UpsertFriendInput,
 ): Promise<Friend> {
   const now = jstNow();
-  const existing = await getFriendByLineUserId(db, input.lineUserId);
+  const hasAccountScope = 'lineAccountId' in input;
+  let existing = hasAccountScope
+    ? await getFriendByLineUserId(db, input.lineUserId, { lineAccountId: input.lineAccountId ?? null })
+    : await getFriendByLineUserId(db, input.lineUserId);
+
+  if (!existing && hasAccountScope && input.lineAccountId) {
+    const legacy = await getFriendByLineUserId(db, input.lineUserId, { lineAccountId: null });
+    if (legacy) {
+      await db
+        .prepare(`UPDATE friends SET line_account_id = ?, updated_at = ? WHERE id = ?`)
+        .bind(input.lineAccountId, now, legacy.id)
+        .run();
+      existing = (await getFriendById(db, legacy.id))!;
+    }
+  }
 
   if (existing) {
     await db
@@ -157,25 +190,25 @@ export async function upsertFriend(
              status_message = ?,
              is_following = 1,
              updated_at = ?
-         WHERE line_user_id = ?`,
+         WHERE id = ?`,
       )
       .bind(
         'displayName' in input ? (input.displayName ?? null) : existing.display_name,
         'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
         'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
         now,
-        input.lineUserId,
+        existing.id,
       )
       .run();
 
-    return (await getFriendByLineUserId(db, input.lineUserId))!;
+    return (await getFriendById(db, existing.id))!;
   }
 
   const id = crypto.randomUUID();
   await db
     .prepare(
-      `INSERT INTO friends (id, line_user_id, display_name, picture_url, status_message, is_following, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO friends (id, line_user_id, display_name, picture_url, status_message, is_following, line_account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -183,6 +216,7 @@ export async function upsertFriend(
       input.displayName ?? null,
       input.pictureUrl ?? null,
       input.statusMessage ?? null,
+      hasAccountScope ? (input.lineAccountId ?? null) : null,
       now,
       now,
     )
@@ -195,7 +229,30 @@ export async function updateFriendFollowStatus(
   db: D1Database,
   lineUserId: string,
   isFollowing: boolean,
+  options: { lineAccountId?: string | null } = {},
 ): Promise<void> {
+  if ('lineAccountId' in options) {
+    if (options.lineAccountId === null) {
+      await db
+        .prepare(
+          `UPDATE friends
+           SET is_following = ?, updated_at = ?
+           WHERE line_user_id = ? AND line_account_id IS NULL`,
+        )
+        .bind(isFollowing ? 1 : 0, jstNow(), lineUserId)
+        .run();
+      return;
+    }
+    await db
+      .prepare(
+        `UPDATE friends
+         SET is_following = ?, updated_at = ?
+         WHERE line_user_id = ? AND line_account_id = ?`,
+      )
+      .bind(isFollowing ? 1 : 0, jstNow(), lineUserId, options.lineAccountId)
+      .run();
+    return;
+  }
   await db
     .prepare(
       `UPDATE friends

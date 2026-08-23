@@ -368,7 +368,7 @@ describe('LINE token verification', () => {
     // does. Mirrors liff.ts allowing multi-account login channels.
     installLineFetchMock('3000000000');
     dbMocks.getLineAccounts.mockResolvedValue([
-      { login_channel_id: '3000000000' } as unknown as never,
+      { id: 'acct-3', login_channel_id: '3000000000' } as unknown as never,
     ]);
 
     const reg = await call('/api/liff/affiliate/register', {
@@ -377,6 +377,9 @@ describe('LINE token verification', () => {
       body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
     });
     expect(reg.status).toBe(200);
+    expect(dbMocks.getFriendByLineUserId).toHaveBeenCalledWith(expect.anything(), 'U-alice', {
+      lineAccountId: 'acct-3',
+    });
   });
 });
 

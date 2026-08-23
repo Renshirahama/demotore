@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { getFriendByLineUserId } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
+import { parseFriendMetadata } from '../lib/friend-metadata.js';
 
 const app = new Hono<Env>();
 
@@ -82,7 +83,7 @@ app.post('/api/meet-callback', async (c) => {
 
   // Save to friend metadata
   try {
-    const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
+    const existing = parseFriendMetadata(friend.metadata);
     const updated = {
       ...existing,
       meet_hearing: {

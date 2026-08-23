@@ -394,6 +394,30 @@ describe('condition-false jump (next_step_on_false)', () => {
 describe('expandVariables comma cleanup scope', () => {
   const friend = { id: 'f1', display_name: 'Test', user_id: null };
 
+  describe('metadata parsing', () => {
+    it('treats invalid metadata JSON as an empty map', () => {
+      const out = expandVariables(
+        'plan={{metadata.plan}}{{#if_metadata.plan}} active{{/if_metadata.plan}}',
+        { ...friend, metadata: '{not json' },
+        undefined,
+        'text',
+      );
+
+      expect(out).toBe('plan=');
+    });
+
+    it('treats non-object metadata JSON as an empty map', () => {
+      const out = expandVariables(
+        '{{#if_metadata.plan}}{{metadata.plan}}{{/if_metadata.plan}}done',
+        { ...friend, metadata: '["gold"]' },
+        undefined,
+        'text',
+      );
+
+      expect(out).toBe('done');
+    });
+  });
+
   describe('text messages are never rewritten', () => {
     it('preserves ",," in a text body', () => {
       const body = '価格は 1,, 2,, 3 のように表記します';

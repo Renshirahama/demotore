@@ -1,4 +1,5 @@
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
+import { parseFriendMetadata } from '../lib/friend-metadata.js';
 
 /**
  * イベントバス — システム内イベントの発火と処理
@@ -373,7 +374,7 @@ async function executeAction(
         .prepare('SELECT metadata FROM friends WHERE id = ?')
         .bind(friendId)
         .first<{ metadata: string }>();
-      const current = JSON.parse(existing?.metadata || '{}') as Record<string, unknown>;
+      const current = parseFriendMetadata(existing?.metadata);
       // {{message}} を受信メッセージ内容に置換してからパース
       // JSON文字列内に埋め込むため、JSON仕様に準拠して全制御文字をエスケープ
       const escapeForJsonString = (s: string): string =>

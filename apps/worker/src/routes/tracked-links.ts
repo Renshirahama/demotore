@@ -272,7 +272,7 @@ function buildAppRedirectHtml(destinationUrl: string): string {
 trackedLinks.get('/t/:linkId', async (c) => {
   const linkId = c.req.param('linkId');
   const lineUserId = c.req.query('lu') ?? null;
-  let friendId = c.req.query('f') ?? null;
+  let friendId: string | null = null;
 
   // Look up the link first
   const link = await getTrackedLinkById(c.env.DB, linkId);
@@ -281,6 +281,9 @@ trackedLinks.get('/t/:linkId', async (c) => {
     return c.json({ success: false, error: 'Link not found' }, 404);
   }
 
+  const linkAccount = await resolveLinkAccount(c.env.DB, link);
+  const linkAccountId = (linkAccount?.id as string | null | undefined) ?? link.line_account_id ?? null;
+
   // Bot UA (LINE/X/Facebook 等のリンクプレビュー) → OGP HTML を返して終了。
   // クリック記録もスキップ（bot のアクセスは CV ではない）。
   const ua = c.req.header('user-agent') || '';
@@ -288,8 +291,7 @@ trackedLinks.get('/t/:linkId', async (c) => {
     const canonical = `${c.env.WORKER_URL || new URL(c.req.url).origin}/t/${linkId}`;
     // link.line_account_id 優先、無ければ scenario 経由でアカウントを解決する。
     // どちらも無いリンクは account=null（og:site_name='LINE' フォールバック）。
-    const account = await resolveLinkAccount(c.env.DB, link);
-    const og = resolveOgForTrackedLink(link, account as any, canonical);
+    const og = resolveOgForTrackedLink(link, linkAccount as any, canonical);
     return c.html(buildOgHtml(og));
   }
 
@@ -301,10 +303,9 @@ trackedLinks.get('/t/:linkId', async (c) => {
   // LIFF はリンクを所有するアカウントのものを使う。グローバル env.LIFF_URL 固定だと
   // 他アカウントの友だちに①の同意画面が出る（未同意チャネルの LIFF に飛ぶため）。
   const isLineApp = /\bLine\b/i.test(ua);
-  if (!useAppRedirect && !lineUserId && !friendId && isLineApp) {
+  if (!useAppRedirect && !lineUserId && isLineApp) {
     let liffBase: string | null = null;
-    const account = await resolveLinkAccount(c.env.DB, link);
-    const liffId = (account?.liff_id as string | null | undefined) ?? null;
+    const liffId = (linkAccount?.liff_id as string | null | undefined) ?? null;
     if (liffId) liffBase = `https://liff.line.me/${liffId}`;
     if (!liffBase && c.env.LIFF_URL) liffBase = c.env.LIFF_URL;
     if (liffBase) {
@@ -314,9 +315,13 @@ trackedLinks.get('/t/:linkId', async (c) => {
     }
   }
 
-  // Resolve friendId from LINE user ID if provided
-  if (!friendId && lineUserId) {
-    const friend = await getFriendByLineUserId(c.env.DB, lineUserId);
+  // Resolve friendId from LINE user ID if provided. Never trust the public `f`
+  // query param; if the link has an owning account, scope the lookup to that
+  // account so the same LINE userId on another official account is not touched.
+  if (lineUserId) {
+    const friend = linkAccountId
+      ? await getFriendByLineUserId(c.env.DB, lineUserId, { lineAccountId: linkAccountId })
+      : await getFriendByLineUserId(c.env.DB, lineUserId);
     if (friend) {
       friendId = friend.id;
     }

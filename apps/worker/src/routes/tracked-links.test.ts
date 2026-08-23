@@ -86,23 +86,45 @@ function makeLink(overrides: Record<string, unknown> = {}) {
   };
 }
 
-const executionCtx = {
-  waitUntil: () => {},
-  passThroughOnException: () => {},
-} as unknown as ExecutionContext;
+function executionCtxWithTasks() {
+  const tasks: Promise<unknown>[] = [];
+  const ctx = {
+    waitUntil: (task: Promise<unknown>) => {
+      tasks.push(task);
+    },
+    passThroughOnException: () => {},
+  } as unknown as ExecutionContext;
+  return { ctx, tasks };
+}
 
 function request(env: Record<string, unknown>, ua: string) {
+  const { ctx } = executionCtxWithTasks();
   return trackedLinks.request(
     'https://worker.example.com/t/link-1',
     { headers: { 'user-agent': ua }, redirect: 'manual' },
     env,
-    executionCtx,
+    ctx,
   );
+}
+
+async function requestWithTasks(env: Record<string, unknown>, url: string, ua: string) {
+  const { ctx, tasks } = executionCtxWithTasks();
+  const res = await trackedLinks.request(
+    url,
+    { headers: { 'user-agent': ua }, redirect: 'manual' },
+    env,
+    ctx,
+  );
+  await Promise.all(tasks);
+  return res;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.recordLinkClick.mockResolvedValue({});
+  dbMocks.addTagToFriend.mockResolvedValue(undefined);
+  dbMocks.enrollFriendInScenario.mockResolvedValue(undefined);
+  dbMocks.getFriendByLineUserId.mockResolvedValue(null);
 });
 
 describe('GET /t/:linkId — per-account LIFF resolution', () => {
@@ -169,5 +191,57 @@ describe('GET /t/:linkId — per-account LIFF resolution', () => {
     const res = await request(env, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15');
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('https://example.com/lp');
+  });
+
+  test('ignores public f query param when recording clicks and side effects', async () => {
+    dbMocks.getTrackedLinkById.mockResolvedValue(makeLink({
+      line_account_id: 'acc-1b',
+      tag_id: 'tag-1',
+      scenario_id: 'scenario-1',
+    }));
+    const env = {
+      DB: makeDb({ accounts: [{ id: 'acc-1b', liff_id: '2009668520-YghzbHx9' }] }),
+      LIFF_URL: 'https://liff.line.me/2009554425-4IMBmLQ9',
+      WORKER_URL: 'https://worker.example.com',
+    };
+
+    const res = await requestWithTasks(
+      env,
+      'https://worker.example.com/t/link-1?f=victim-friend',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15',
+    );
+
+    expect(res.status).toBe(302);
+    expect(dbMocks.recordLinkClick).toHaveBeenCalledWith(expect.anything(), 'link-1', null);
+    expect(dbMocks.addTagToFriend).not.toHaveBeenCalled();
+    expect(dbMocks.enrollFriendInScenario).not.toHaveBeenCalled();
+  });
+
+  test('resolves lu with the tracked link account before running side effects', async () => {
+    dbMocks.getTrackedLinkById.mockResolvedValue(makeLink({
+      line_account_id: 'acc-1b',
+      tag_id: 'tag-1',
+      scenario_id: 'scenario-1',
+    }));
+    dbMocks.getFriendByLineUserId.mockResolvedValue({ id: 'friend-1' });
+    const env = {
+      DB: makeDb({ accounts: [{ id: 'acc-1b', liff_id: '2009668520-YghzbHx9' }] }),
+      LIFF_URL: 'https://liff.line.me/2009554425-4IMBmLQ9',
+      WORKER_URL: 'https://worker.example.com',
+    };
+
+    const res = await requestWithTasks(
+      env,
+      'https://worker.example.com/t/link-1?lu=U1&f=victim-friend',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15',
+    );
+
+    expect(res.status).toBe(302);
+    expect(dbMocks.getFriendByLineUserId).toHaveBeenCalledWith(expect.anything(), 'U1', {
+      lineAccountId: 'acc-1b',
+    });
+    expect(dbMocks.recordLinkClick).toHaveBeenCalledWith(expect.anything(), 'link-1', 'friend-1');
+    expect(dbMocks.addTagToFriend).toHaveBeenCalledWith(expect.anything(), 'friend-1', 'tag-1');
+    expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(expect.anything(), 'friend-1', 'scenario-1');
   });
 });

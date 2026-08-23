@@ -11,8 +11,10 @@ import {
   updateCalendarBookingEventId,
   getBookingsInRange,
   toJstString,
+  getFriendByLineUserId,
 } from '@line-crm/db';
 import { GoogleCalendarClient } from '../services/google-calendar.js';
+import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import type { Env } from '../index.js';
 
 const calendar = new Hono<Env>();
@@ -179,9 +181,21 @@ calendar.post('/api/integrations/google-calendar/book', async (c) => {
       return c.json({ success: false, error: 'connectionId, title, startAt, endAt are required' }, 400);
     }
 
+    const caller = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!caller) {
+      return c.json({ success: false, error: 'idToken required' }, 401);
+    }
+    const friend = caller.lineAccountId
+      ? await getFriendByLineUserId(c.env.DB, caller.lineUserId, { lineAccountId: caller.lineAccountId })
+      : await getFriendByLineUserId(c.env.DB, caller.lineUserId);
+    if (!friend) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+
     // D1 に予約レコードを作成
     const booking = await createCalendarBooking(c.env.DB, {
       ...body,
+      friendId: friend.id,
       metadata: body.metadata ? JSON.stringify(body.metadata) : undefined,
     });
 

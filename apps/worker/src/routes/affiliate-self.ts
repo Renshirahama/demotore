@@ -75,9 +75,13 @@ async function resolveFriendFromLineToken(
 
   const allowedChannelIds = new Set<string>();
   if (env.LINE_LOGIN_CHANNEL_ID) allowedChannelIds.add(env.LINE_LOGIN_CHANNEL_ID);
+  const accountIdByLoginChannel = new Map<string, string>();
   const dbAccounts = await getLineAccounts(db);
   for (const acct of dbAccounts) {
-    if (acct.login_channel_id) allowedChannelIds.add(acct.login_channel_id);
+    if (acct.login_channel_id) {
+      allowedChannelIds.add(acct.login_channel_id);
+      accountIdByLoginChannel.set(acct.login_channel_id, acct.id);
+    }
   }
   if (!allowedChannelIds.has(tokenClientId)) return { status: 'invalid_token' };
 
@@ -89,7 +93,10 @@ async function resolveFriendFromLineToken(
   const { userId } = await prof.json<{ userId: string }>();
   if (!userId) return { status: 'invalid_token' };
 
-  const friend = await getFriendByLineUserId(db, userId);
+  const tokenLineAccountId = accountIdByLoginChannel.get(tokenClientId) ?? null;
+  const friend = tokenLineAccountId
+    ? await getFriendByLineUserId(db, userId, { lineAccountId: tokenLineAccountId })
+    : await getFriendByLineUserId(db, userId);
   if (!friend) return { status: 'no_friend' };
   return { status: 'ok', friend: friend as unknown as ResolvedFriend };
 }

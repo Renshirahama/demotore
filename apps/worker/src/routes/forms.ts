@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getForms,
   getFormsWithStats,
@@ -17,6 +17,8 @@ import type {
   FormSubmission as DbFormSubmission,
   FormUsedByAccount,
 } from '@line-crm/db';
+import { mergeFriendMetadata, parseFriendMetadata } from '../lib/friend-metadata.js';
+import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import type { Env } from '../index.js';
 
 const forms = new Hono<Env>();
@@ -228,6 +230,26 @@ function serializeSubmission(row: DbFormSubmission & { friend_name?: string | nu
   };
 }
 
+async function resolveVerifiedFormFriend(
+  c: Context<Env>,
+  body: { lineUserId?: string; friendId?: string },
+) {
+  const caller = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+  if (!caller) {
+    return { error: c.json({ success: false, error: 'idToken required' }, 401) };
+  }
+  if (body.lineUserId && body.lineUserId !== caller.lineUserId) {
+    return { error: c.json({ success: false, error: 'Token mismatch' }, 403) };
+  }
+  const friend = caller.lineAccountId
+    ? await getFriendByLineUserId(c.env.DB, caller.lineUserId, { lineAccountId: caller.lineAccountId })
+    : await getFriendByLineUserId(c.env.DB, caller.lineUserId);
+  if (!friend) {
+    return { error: c.json({ success: false, error: 'Friend not found' }, 404) };
+  }
+  return { friend, callerLineUserId: caller.lineUserId };
+}
+
 // GET /api/forms — list all forms (with submission stats + delivering accounts)
 forms.get('/api/forms', async (c) => {
   try {
@@ -400,15 +422,18 @@ forms.post('/api/forms/:id/opened', async (c) => {
   try {
     const formId = c.req.param('id');
     const body = await c.req.json<{ lineUserId?: string; friendId?: string }>();
-    const lineUserId = body.lineUserId;
-    const friendId = body.friendId;
 
-    // Resolve friend
-    let friend = friendId
-      ? await getFriendById(c.env.DB, friendId)
-      : lineUserId
-        ? await getFriendByLineUserId(c.env.DB, lineUserId)
-        : null;
+    // Open tracking is best-effort and may be anonymous, but never trust
+    // friendId/lineUserId from the browser. If a LIFF id_token is present and
+    // matches the optional lineUserId hint, attach the open to the verified
+    // caller's friend row; otherwise record an anonymous open.
+    let friend: Awaited<ReturnType<typeof getFriendByLineUserId>> | null = null;
+    const caller = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (caller && (!body.lineUserId || body.lineUserId === caller.lineUserId)) {
+      friend = caller.lineAccountId
+        ? await getFriendByLineUserId(c.env.DB, caller.lineUserId, { lineAccountId: caller.lineAccountId })
+        : await getFriendByLineUserId(c.env.DB, caller.lineUserId);
+    }
 
     const now = jstNow();
     await c.env.DB.prepare(
@@ -434,20 +459,12 @@ forms.post('/api/forms/:id/partial', async (c) => {
     const formId = c.req.param('id');
     const body = await c.req.json<{ lineUserId?: string; friendId?: string; data?: Record<string, unknown> }>();
 
-    // Resolve friend
-    let friend = body.friendId
-      ? await getFriendById(c.env.DB, body.friendId)
-      : body.lineUserId
-        ? await getFriendByLineUserId(c.env.DB, body.lineUserId)
-        : null;
-
-    if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
-    }
+    const verified = await resolveVerifiedFormFriend(c, body);
+    if ('error' in verified) return verified.error;
+    const { friend } = verified;
 
     // Save survey data to friend metadata (merge with existing)
-    const existingMeta = friend.metadata ? JSON.parse(friend.metadata) : {};
-    const merged = { ...existingMeta, ...body.data };
+    const merged = mergeFriendMetadata(friend.metadata, body.data ?? {});
     await c.env.DB.prepare(
       'UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?',
     ).bind(JSON.stringify(merged), jstNow(), friend.id).run();
@@ -501,13 +518,14 @@ forms.post('/api/forms/:id/submit', async (c) => {
       }
     }
 
-    // Resolve friend by lineUserId or friendId
-    let friendId: string | null = body.friendId ?? null;
-    if (!friendId && body.lineUserId) {
-      const friend = await getFriendByLineUserId(c.env.DB, body.lineUserId);
-      if (friend) {
-        friendId = friend.id;
-      }
+    // Anonymous submissions are accepted, but friend-bound side effects require
+    // a verified LIFF id_token. Do not trust lineUserId/friendId from the body.
+    let friendId: string | null = null;
+    const wantsFriendBinding = Boolean(body.lineUserId || body.friendId || body.trackedLinkId);
+    if (wantsFriendBinding) {
+      const verified = await resolveVerifiedFormFriend(c, body);
+      if ('error' in verified) return verified.error;
+      friendId = verified.friend.id;
     }
 
     // Webhook gate — skip if client pre-verified via repliers endpoint
@@ -604,8 +622,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
           (async () => {
             const friend = await getFriendById(db, friendId!);
             if (!friend) return;
-            const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
-            const merged = { ...existing, ...submissionData };
+            const merged = mergeFriendMetadata(friend.metadata, submissionData);
             await db
               .prepare(`UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?`)
               .bind(JSON.stringify(merged), now, friendId)
@@ -636,7 +653,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
 
             const friend = await getFriendById(db, friendId!);
             if (!friend) return;
-            const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
+            const existing = parseFriendMetadata(friend.metadata);
             const merged = {
               ...existing,
               money_diagnosis_type: diagnosis.type,

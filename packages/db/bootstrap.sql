@@ -449,19 +449,23 @@ CREATE TABLE friend_tags (
 
 CREATE TABLE friends (
   id               TEXT PRIMARY KEY,
-  line_user_id     TEXT UNIQUE NOT NULL,
+  line_user_id     TEXT NOT NULL,
   display_name     TEXT,
   picture_url      TEXT,
   status_message   TEXT,
   is_following     INTEGER NOT NULL DEFAULT 1,
   user_id          TEXT,
   ig_igsid         TEXT,
+  ref_code         TEXT,
+  metadata         TEXT NOT NULL DEFAULT '{}',
+  line_account_id  TEXT REFERENCES line_accounts(id),
+  first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL,
   score            INTEGER NOT NULL DEFAULT 0,
   last_ref_code    TEXT,
   last_ref_at      TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL);
+);
 
 CREATE TABLE google_calendar_connections (
   id            TEXT PRIMARY KEY,
@@ -938,7 +942,11 @@ CREATE INDEX idx_friend_scores_friend ON friend_scores (friend_id);
 
 CREATE INDEX idx_friend_tags_tag_id ON friend_tags (tag_id);
 
+CREATE UNIQUE INDEX idx_friends_account_line_user_id ON friends (line_account_id, line_user_id) WHERE line_account_id IS NOT NULL;
+
 CREATE INDEX idx_friends_ig_igsid ON friends (ig_igsid);
+
+CREATE UNIQUE INDEX idx_friends_legacy_line_user_id ON friends (line_user_id) WHERE line_account_id IS NULL;
 
 CREATE INDEX idx_friends_line_user_id ON friends (line_user_id);
 

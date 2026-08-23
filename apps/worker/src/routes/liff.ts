@@ -24,7 +24,9 @@ import {
 } from '@line-crm/db';
 import { buildIntroMessage } from '../services/intro-message.js';
 import { notifyAffiliateFriendAdd } from '../services/affiliate-notifier.js';
+import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { safeRedirectTarget } from '../lib/safe-redirect.js';
+import { mergeFriendMetadata, parseFriendMetadata } from '../lib/friend-metadata.js';
 import type { Env } from '../index.js';
 
 const liffRoutes = new Hono<Env>();
@@ -120,7 +122,7 @@ async function saveIgAccountMeta(
       .prepare('SELECT metadata FROM friends WHERE id = ?')
       .bind(friendId)
       .first<{ metadata: string }>();
-    const meta = JSON.parse(existing?.metadata || '{}');
+    const meta = parseFriendMetadata(existing?.metadata);
     if (meta.ig_account_id || meta.ig_account_username) return; // first touch wins
     if (igAccountId) meta.ig_account_id = igAccountId;
     if (igAccountUsername) meta.ig_account_username = igAccountUsername.replace(/^@/, '');
@@ -750,11 +752,13 @@ liffRoutes.get('/auth/callback', async (c) => {
     // Multi-account: resolve LINE Login credentials from DB
     let loginChannelId = c.env.LINE_LOGIN_CHANNEL_ID;
     let loginChannelSecret = c.env.LINE_LOGIN_CHANNEL_SECRET;
+    let resolvedLineAccountId: string | null = null;
     if (accountParam) {
       const account = await getLineAccountByChannelId(c.env.DB, accountParam);
       if (account?.login_channel_id && account?.login_channel_secret) {
         loginChannelId = account.login_channel_id;
         loginChannelSecret = account.login_channel_secret;
+        resolvedLineAccountId = account.id;
       }
     }
 
@@ -827,12 +831,15 @@ liffRoutes.get('/auth/callback', async (c) => {
     // Detect a brand-new friend BEFORE upsertFriend creates the row, so the ASP
     // affiliate friend-add notification fires once per genuinely-new add (a
     // re-touch of an existing friend must not re-notify the affiliate).
-    const preExistingFriend = await getFriendByLineUserId(db, lineUserId);
+    const preExistingFriend = resolvedLineAccountId
+      ? await getFriendByLineUserId(db, lineUserId, { lineAccountId: resolvedLineAccountId })
+      : await getFriendByLineUserId(db, lineUserId);
     const isNewFriend = !preExistingFriend;
 
     // Upsert friend (may not exist yet if webhook hasn't fired)
     const friend = await upsertFriend(db, {
       lineUserId,
+      lineAccountId: resolvedLineAccountId,
       displayName,
       pictureUrl,
       statusMessage: null,
@@ -926,7 +933,7 @@ liffRoutes.get('/auth/callback', async (c) => {
         .prepare('SELECT metadata FROM friends WHERE id = ?')
         .bind(friend.id)
         .first<{ metadata: string }>();
-      const merged = { ...JSON.parse(existingMeta?.metadata || '{}'), ...adMeta };
+      const merged = mergeFriendMetadata(existingMeta?.metadata, adMeta);
       await db
         .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
         .bind(JSON.stringify(merged), jstNow(), friend.id)
@@ -943,7 +950,7 @@ liffRoutes.get('/auth/callback', async (c) => {
             .prepare('SELECT metadata FROM friends WHERE id = ?')
             .bind(friend.id)
             .first<{ metadata: string }>();
-          const meta = JSON.parse(existingMeta?.metadata || '{}');
+          const meta = parseFriendMetadata(existingMeta?.metadata);
           meta.x_username = xhResult.xUsername;
           await db
             .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
@@ -1186,31 +1193,42 @@ liffRoutes.get('/api/liff/config', async (c) => {
     if (!liffId) {
       return c.json({ success: false, error: 'liffId is required' }, 400);
     }
+    if (!/^[0-9]+-[A-Za-z0-9]+$/.test(liffId)) {
+      return c.json({ success: false, error: 'Invalid liffId' }, 400);
+    }
 
     const account = await c.env.DB
       .prepare('SELECT id, name, channel_access_token FROM line_accounts WHERE liff_id = ? AND is_active = 1')
       .bind(liffId)
-      .first<{ id: string; name: string; channel_access_token: string }>();
+      .first<{ id: string; name: string; channel_access_token: string | null }>();
 
-    // Fallback to default env account if liff_id not found in DB
+    const envLiffId = (c.env.LIFF_URL || '').match(/liff\.line\.me\/([0-9]+-[A-Za-z0-9]+)/)?.[1] ?? null;
+    if (!account && liffId !== envLiffId) {
+      return c.json({ success: false, error: 'LIFF app not found' }, 404);
+    }
+
+    // Fallback to default env account only for the configured default LIFF app.
     const accessToken = account?.channel_access_token || c.env.LINE_CHANNEL_ACCESS_TOKEN;
     const accountName = account?.name || 'Default';
     const accountId = account?.id || 'default';
 
     // Fetch bot basic ID from LINE API
     let botBasicId = '';
-    try {
-      const botRes = await fetch('https://api.line.me/v2/bot/info', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (botRes.ok) {
-        const bot = await botRes.json() as { basicId?: string };
-        botBasicId = bot.basicId || '';
+    if (accessToken) {
+      try {
+        const botRes = await fetch('https://api.line.me/v2/bot/info', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (botRes.ok) {
+          const bot = await botRes.json() as { basicId?: string };
+          botBasicId = bot.basicId || '';
+        }
+      } catch {
+        // non-blocking
       }
-    } catch {
-      // non-blocking
     }
 
+    c.header('Cache-Control', 'public, max-age=300');
     return c.json({
       success: true,
       data: { botBasicId, accountName, accountId },
@@ -1223,15 +1241,21 @@ liffRoutes.get('/api/liff/config', async (c) => {
 
 // ─── Existing LIFF endpoints ────────────────────────────────────
 
-// POST /api/liff/profile - get friend by LINE userId (public, no auth)
+// POST /api/liff/profile - get the caller's friend profile via verified LIFF id_token
 liffRoutes.post('/api/liff/profile', async (c) => {
   try {
-    const body = await c.req.json<{ lineUserId: string }>();
-    if (!body.lineUserId) {
-      return c.json({ success: false, error: 'lineUserId is required' }, 400);
+    const body = await c.req.json<{ lineUserId?: string }>();
+    const caller = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!caller) {
+      return c.json({ success: false, error: 'idToken required' }, 401);
+    }
+    if (body.lineUserId && body.lineUserId !== caller.lineUserId) {
+      return c.json({ success: false, error: 'Token mismatch' }, 403);
     }
 
-    const friend = await getFriendByLineUserId(c.env.DB, body.lineUserId);
+    const friend = caller.lineAccountId
+      ? await getFriendByLineUserId(c.env.DB, caller.lineUserId, { lineAccountId: caller.lineAccountId })
+      : await getFriendByLineUserId(c.env.DB, caller.lineUserId);
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
@@ -1278,13 +1302,17 @@ liffRoutes.post('/api/liff/link', async (c) => {
     }
 
     let verifyRes: Response | null = null;
+    let verifiedLoginChannelId: string | null = null;
     for (const channelId of loginChannelIds) {
       verifyRes = await fetch('https://api.line.me/oauth2/v2.1/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ id_token: body.idToken, client_id: channelId }),
       });
-      if (verifyRes.ok) break;
+      if (verifyRes.ok) {
+        verifiedLoginChannelId = channelId;
+        break;
+      }
     }
 
     if (!verifyRes?.ok) {
@@ -1296,7 +1324,12 @@ liffRoutes.post('/api/liff/link', async (c) => {
     const email = verified.email || null;
 
     const db = c.env.DB;
-    const friend = await getFriendByLineUserId(db, lineUserId);
+    const verifiedAccount = verifiedLoginChannelId
+      ? dbAccounts.find((acct) => acct.login_channel_id === verifiedLoginChannelId)
+      : null;
+    const friend = verifiedAccount
+      ? await getFriendByLineUserId(db, lineUserId, { lineAccountId: verifiedAccount.id })
+      : await getFriendByLineUserId(db, lineUserId);
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
@@ -1342,7 +1375,7 @@ liffRoutes.post('/api/liff/link', async (c) => {
               .prepare('SELECT metadata FROM friends WHERE id = ?')
               .bind(friend.id)
               .first<{ metadata: string }>();
-            const meta = JSON.parse(existingMeta?.metadata || '{}');
+            const meta = parseFriendMetadata(existingMeta?.metadata);
             meta.x_username = xhResult.xUsername;
             await db
               .prepare('UPDATE friends SET metadata = ? WHERE id = ?')
@@ -1410,7 +1443,7 @@ liffRoutes.post('/api/liff/link', async (c) => {
             .prepare('SELECT metadata FROM friends WHERE id = ?')
             .bind(friend.id)
             .first<{ metadata: string }>();
-          const meta = JSON.parse(existingMeta?.metadata || '{}');
+          const meta = parseFriendMetadata(existingMeta?.metadata);
           meta.x_username = xhResult.xUsername;
           await db
             .prepare('UPDATE friends SET metadata = ? WHERE id = ?')
@@ -1848,12 +1881,16 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
       return c.json({ success: false, error: 'idToken required' }, 401);
     }
 
+    const dbAccounts = await getLineAccounts(c.env.DB);
+    let verifiedLoginChannelId: string | null = null;
+
     // Verify idToken — ensures caller is the actual user
     {
-      const loginChannelIds = [c.env.LINE_LOGIN_CHANNEL_ID];
-      const dbAccounts = await getLineAccounts(c.env.DB);
+      const loginChannelIds = [c.env.LINE_LOGIN_CHANNEL_ID].filter(Boolean);
       for (const acct of dbAccounts) {
-        if (acct.login_channel_id) loginChannelIds.push(acct.login_channel_id);
+        if (acct.login_channel_id && !loginChannelIds.includes(acct.login_channel_id)) {
+          loginChannelIds.push(acct.login_channel_id);
+        }
       }
       let verified = false;
       for (const channelId of loginChannelIds) {
@@ -1868,6 +1905,7 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
             return c.json({ success: false, error: 'Token mismatch' }, 403);
           }
           verified = true;
+          verifiedLoginChannelId = channelId;
           break;
         }
       }
@@ -1877,7 +1915,12 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
     }
 
     const db = c.env.DB;
-    const friend = await getFriendByLineUserId(db, lineUserId);
+    const verifiedAccount = verifiedLoginChannelId
+      ? dbAccounts.find((acct) => acct.login_channel_id === verifiedLoginChannelId)
+      : null;
+    const friend = verifiedAccount
+      ? await getFriendByLineUserId(db, lineUserId, { lineAccountId: verifiedAccount.id })
+      : await getFriendByLineUserId(db, lineUserId);
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }

@@ -55,6 +55,7 @@ interface FormState {
   formDef: FormDef | null;
   xHarnessBaseUrl: string | null;
   profile: { userId: string; displayName: string; pictureUrl?: string } | null;
+  idToken: string | null;
   friendId: string | null;
   submitting: boolean;
   verifiedXUsername: string;
@@ -71,6 +72,7 @@ const state: FormState = {
   formDef: null,
   xHarnessBaseUrl: null,
   profile: null,
+  idToken: null,
   friendId: null,
   submitting: false,
   verifiedXUsername: '',
@@ -103,6 +105,7 @@ function apiCall(path: string, options?: RequestInit): Promise<Response> {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(state.idToken ? { Authorization: `Bearer ${state.idToken}` } : {}),
       ...options?.headers,
     },
   });
@@ -1197,6 +1200,7 @@ export async function initForm(formId: string | null): Promise<void> {
 
     // Silent UUID linking (best-effort, so friend metadata saves correctly)
     const rawIdToken = shouldUseLiff ? liff.getIDToken() : null;
+    state.idToken = rawIdToken;
     if (rawIdToken && profile) {
       apiCall('/api/liff/link', {
         method: 'POST',
@@ -1265,7 +1269,6 @@ export async function initForm(formId: string | null): Promise<void> {
       method: 'POST',
       body: JSON.stringify({
         lineUserId: state.profile?.userId,
-        friendId: state.friendId,
       }),
     }).catch(() => { /* silent */ });
   } catch (err) {
