@@ -99,6 +99,19 @@ export const TEMPLATES: RichMenuTemplate[] = [
     ],
   },
   {
+    key: 'rebnise-four-button',
+    label: 'REBNISE 4ボタンメニュー (画像つき)',
+    size: 'large',
+    description: '公式サイト・試合日程・チケット申請・お問い合わせの 4 ボタン',
+    imagePath: '/rich-menu-presets/rebnise-four-button-menu.png',
+    areas: [
+      { x: 0, y: 0, w: LARGE.width / 2, h: LARGE.height / 2 },
+      { x: LARGE.width / 2, y: 0, w: LARGE.width / 2, h: LARGE.height / 2 },
+      { x: 0, y: LARGE.height / 2, w: LARGE.width / 2, h: LARGE.height / 2 },
+      { x: LARGE.width / 2, y: LARGE.height / 2, w: LARGE.width / 2, h: LARGE.height / 2 },
+    ],
+  },
+  {
     key: 'large-empty',
     label: '空白 (自由配置)',
     size: 'large',

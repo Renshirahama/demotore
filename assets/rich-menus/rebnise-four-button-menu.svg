@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="2500" viewBox="0 0 2500 2500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#16162a"/>
+      <stop offset="100%" stop-color="#111126"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1d1d35"/>
+      <stop offset="100%" stop-color="#151529"/>
+    </linearGradient>
+    <style>
+      .font { font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif; letter-spacing: 0; }
+      .title { font-size: 92px; font-weight: 900; fill: #ffffff; }
+      .sub { font-size: 40px; font-weight: 900; fill: #d4b86f; }
+    </style>
+  </defs>
+  <rect width="2500" height="2500" fill="url(#bg)"/>
+  <g transform="translate(0 407)">
+    <rect width="2500" height="1686" fill="url(#bg)"/>
+    <rect x="0" y="0" width="2500" height="8" fill="#c8aa64"/>
+    <line x1="1250" y1="64" x2="1250" y2="1622" stroke="#2a2a3c" stroke-width="2"/>
+    <line x1="72" y1="843" x2="2428" y2="843" stroke="#2a2a3c" stroke-width="2"/>
+
+    <g>
+      <rect x="76" y="82" width="1098" height="704" rx="18" fill="url(#card)" stroke="#403a32" stroke-width="2"/>
+      <g transform="translate(625 210)" stroke="#d4b86f" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M -58 -8 L 0 -64 L 58 -8"/>
+        <path d="M -42 -10 L -42 64 L 42 64 L 42 -10"/>
+        <path d="M -11 64 L -11 20 L 16 20 L 16 64"/>
+      </g>
+      <text class="font title" x="625" y="448" text-anchor="middle">公式サイト</text>
+      <rect x="577" y="526" width="96" height="4" rx="2" fill="#c8aa64"/>
+      <text class="font sub" x="625" y="603" text-anchor="middle">OFFICIAL SITE</text>
+    </g>
+
+    <g>
+      <rect x="1326" y="82" width="1098" height="704" rx="18" fill="url(#card)" stroke="#403a32" stroke-width="2"/>
+      <g transform="translate(1875 208)" stroke="#d4b86f" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="-58" y="-52" width="116" height="104" rx="14"/>
+        <path d="M -58 -20 L 58 -20"/>
+        <path d="M -27 -70 L -27 -34"/>
+        <path d="M 27 -70 L 27 -34"/>
+        <circle cx="0" cy="18" r="5" fill="#d4b86f"/>
+      </g>
+      <text class="font title" x="1875" y="448" text-anchor="middle">試合日程</text>
+      <rect x="1827" y="526" width="96" height="4" rx="2" fill="#c8aa64"/>
+      <text class="font sub" x="1875" y="603" text-anchor="middle">GAME SCHEDULE</text>
+    </g>
+
+    <g>
+      <rect x="76" y="900" width="1098" height="704" rx="18" fill="url(#card)" stroke="#403a32" stroke-width="2"/>
+      <g transform="translate(625 1029)" stroke="#d4b86f" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M -72 -38 H 72 V 56 H -72 Z"/>
+        <path d="M -72 -6 H 72"/>
+        <circle cx="-72" cy="12" r="15" fill="#111126"/>
+        <circle cx="72" cy="12" r="15" fill="#111126"/>
+      </g>
+      <text class="font title" x="625" y="1266" text-anchor="middle">チケット申請</text>
+      <rect x="577" y="1344" width="96" height="4" rx="2" fill="#c8aa64"/>
+      <text class="font sub" x="625" y="1421" text-anchor="middle">TICKET REQUEST</text>
+    </g>
+
+    <g>
+      <rect x="1326" y="900" width="1098" height="704" rx="18" fill="url(#card)" stroke="#403a32" stroke-width="2"/>
+      <g transform="translate(1875 1028)" stroke="#d4b86f" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M -76 -48 H 76 V 42 H -12 L -47 76 V 42 H -76 Z"/>
+        <path d="M -34 -14 H 36"/>
+        <path d="M -34 17 H 22"/>
+      </g>
+      <text class="font title" x="1875" y="1266" text-anchor="middle">お問い合わせ</text>
+      <rect x="1827" y="1344" width="96" height="4" rx="2" fill="#c8aa64"/>
+      <text class="font sub" x="1875" y="1421" text-anchor="middle">CONTACT</text>
+    </g>
+  </g>
+</svg>
