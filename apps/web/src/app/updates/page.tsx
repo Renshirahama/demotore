@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL!
+const API_URL = process.env.NEXT_PUBLIC_API_URL
+if (!API_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL is not set. Build cannot proceed.')
+}
 // self-update を構成した環境 (create-line-harness セットアップ) でのみ設定される。
 // 未設定 = 自動アップデート非構成環境なので、この画面は fetch せず案内のみ表示する。
 const ADMIN_KEY = process.env.NEXT_PUBLIC_ADMIN_API_KEY

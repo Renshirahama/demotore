@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
+  cacheDir: '.vitest-cache',
   resolve: {
     alias: {
       // @line-crm/line-sdk has main=dist/index.js but dist may not exist in

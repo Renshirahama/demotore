@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 // Root vitest config — only picks up tests under `scripts/`.
 // Per-package tests (apps/worker, packages/*) keep their own configs.
 export default defineConfig({
+  cacheDir: '.vitest-cache',
   test: {
     environment: 'node',
     globals: false,

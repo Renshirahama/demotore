@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "WRANGLER_LOG_PATH=.wrangler/logs vite dev --configLoader runner",
     "test": "vitest run",
-    "build": "vite build",
-    "preview": "vite preview",
-    "deploy": "vite build && wrangler deploy",
+    "build": "WRANGLER_LOG_PATH=.wrangler/logs vite build --configLoader runner",
+    "preview": "WRANGLER_LOG_PATH=.wrangler/logs vite preview --configLoader runner",
+    "deploy": "WRANGLER_LOG_PATH=.wrangler/logs vite build --configLoader runner && WRANGLER_LOG_PATH=.wrangler/logs wrangler deploy",
     "typecheck": "tsc --noEmit",
     "inject-version": "tsx scripts/inject-version.ts"
   },

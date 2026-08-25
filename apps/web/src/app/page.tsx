@@ -73,6 +73,8 @@ function StatCard({ title, value, loading, icon, href, accentColor = '#06C755' }
 
 export default function DashboardPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
+  const workerBase = process.env.NEXT_PUBLIC_API_URL
+  const demoHref = workerBase ? `${workerBase}/auth/line?ref=dashboard` : '#'
   const [stats, setStats] = useState<DashboardStats>({
     friendCount: null,
     activeScenarioCount: null,
@@ -153,7 +155,7 @@ export default function DashboardPage() {
 
       {/* Demo banner */}
       <a
-        href="https://your-worker.your-subdomain.workers.dev/auth/line?ref=dashboard"
+        href={demoHref}
         target="_blank"
         rel="noopener noreferrer"
         className="block mb-6 p-4 rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 transition-colors"

@@ -1,5 +1,5 @@
 import * as p from "@clack/prompts";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
@@ -56,6 +56,21 @@ function stageAdminFiles(
   return stageDir;
 }
 
+function hideApiRoutesForStaticExport(webDir: string): () => void {
+  const apiDir = join(webDir, "src/app/api");
+  const hiddenDir = join(webDir, "src/app/api.__line_harness_static_export__");
+  if (!existsSync(apiDir)) return () => {};
+  if (existsSync(hiddenDir)) {
+    throw new Error(
+      `Static export helper found an existing temporary API directory: ${hiddenDir}`,
+    );
+  }
+  renameSync(apiDir, hiddenDir);
+  return () => {
+    if (existsSync(hiddenDir)) renameSync(hiddenDir, apiDir);
+  };
+}
+
 export async function deployAdmin(
   options: DeployAdminOptions,
 ): Promise<DeployAdminResult> {
@@ -83,11 +98,21 @@ export async function deployAdmin(
     const envContent = `NEXT_PUBLIC_API_URL=${options.workerUrl}\n`;
     writeFileSync(join(webDir, ".env.production"), envContent);
 
+    const restoreApiRoutes = hideApiRoutesForStaticExport(webDir);
     try {
-      await repoPnpm(options.repoDir, ["run", "build"], { cwd: webDir });
+      await repoPnpm(options.repoDir, ["run", "build"], {
+        cwd: webDir,
+        env: {
+          ...process.env,
+          NEXT_OUTPUT_EXPORT: "true",
+          NEXT_PUBLIC_API_URL: options.workerUrl,
+        },
+      });
     } catch (error: any) {
       buildSpinner.stop("Admin UI ビルド失敗");
       throw new Error(`Admin UI のビルドに失敗しました: ${error.message}`);
+    } finally {
+      restoreApiRoutes();
     }
     buildSpinner.stop("Admin UI ビルド完了");
     deployDir = "out";
