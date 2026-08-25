@@ -128,7 +128,7 @@ describe('POST /api/booking/admin/bookings', () => {
     friend_id: 'f1',
     menu_id: 'm1',
     staff_id: 's1',
-    starts_at: '2026-07-10T02:00:00.000Z', // JST 11:00
+    starts_at: '2026-09-10T02:00:00.000Z', // JST 11:00
   };
 
   function happyDb(insertChanges = 1) {

@@ -235,7 +235,7 @@ export default function RichMenusListPage() {
               className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col"
             >
               <Link
-                href={`/rich-menus/edit?id=${g.id}`}
+                href={`/rich-menus/edit?id=${encodeURIComponent(g.id)}`}
                 className="flex-1 hover:bg-gray-50 rounded-t-lg overflow-hidden"
               >
                 {/* thumbnail */}
@@ -285,7 +285,7 @@ export default function RichMenusListPage() {
                   </button>
                 )}
                 <Link
-                  href={`/rich-menus/edit?id=${g.id}`}
+                  href={`/rich-menus/edit?id=${encodeURIComponent(g.id)}`}
                   className="text-gray-600 hover:underline"
                 >
                   編集
@@ -453,7 +453,7 @@ function ExternalSection({
                   <td className="px-3 py-2.5 text-xs">
                     {m.adminManaged && m.adminInfo ? (
                       <Link
-                        href={`/rich-menus/edit?id=${m.adminInfo.groupId}`}
+                        href={`/rich-menus/edit?id=${encodeURIComponent(m.adminInfo.groupId)}`}
                         className="text-gray-700 hover:underline"
                       >
                         管理画面 → {m.adminInfo.groupName}

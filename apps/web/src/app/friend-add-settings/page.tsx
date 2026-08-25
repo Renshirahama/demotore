@@ -138,7 +138,7 @@ export default function FriendAddSettingsPage() {
       }
       // Pre-select the account so the editor stays in the right context, then jump to the new scenario's editor.
       setSelectedAccountId(accountId)
-      router.push(`/scenarios/detail?id=${res.data.id}`)
+      router.push(`/scenarios/detail?id=${encodeURIComponent(res.data.id)}`)
     } catch {
       setError('シナリオ作成に失敗しました')
     }
@@ -249,7 +249,7 @@ function OrphanSection({
         {scenarios.map(scenario => (
           <li key={scenario.id} className="px-4 py-3 flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <Link href={`/scenarios/detail?id=${scenario.id}`} className="block">
+              <Link href={`/scenarios/detail?id=${encodeURIComponent(scenario.id)}`} className="block">
                 <div className="font-medium text-gray-900 truncate">{scenario.name}</div>
                 <div className="text-xs text-gray-400 mt-1">
                   元 line_account_id: {scenario.lineAccountId} ・ 更新 {scenario.updatedAt.slice(0, 10)}
@@ -319,7 +319,7 @@ function AccountSection({
           {row.scenarios.map(scenario => (
             <li key={scenario.id} className="px-4 py-3 flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <Link href={`/scenarios/detail?id=${scenario.id}`} className="block">
+                <Link href={`/scenarios/detail?id=${encodeURIComponent(scenario.id)}`} className="block">
                   <div className="font-medium text-gray-900 truncate flex items-center gap-2">
                     {scenario.name}
                     {scenario.isGlobal && (

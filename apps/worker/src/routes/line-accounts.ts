@@ -181,6 +181,12 @@ function normalizeOptionalString(v: unknown): string | null | undefined {
   return trimmed === '' ? null : trimmed;
 }
 
+function normalizeRequiredString(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const trimmed = v.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
 // Pair-validate Login Channel ID / Secret. Required because the OAuth flow
 // asymmetrically gates on the two columns:
 //   /auth/line       — switches to account-specific client_id as soon as
@@ -270,7 +276,12 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
       ogDefaultDescription?: string | null;
     }>();
 
-    if (!body.channelId || !body.name || !body.channelAccessToken || !body.channelSecret) {
+    const channelId = normalizeRequiredString(body.channelId);
+    const name = normalizeRequiredString(body.name);
+    const channelAccessToken = normalizeRequiredString(body.channelAccessToken);
+    const channelSecret = normalizeRequiredString(body.channelSecret);
+
+    if (!channelId || !name || !channelAccessToken || !channelSecret) {
       return c.json(
         { success: false, error: 'channelId, name, channelAccessToken, and channelSecret are required' },
         400,
@@ -294,10 +305,10 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
     if (dupError) return c.json({ success: false, error: dupError }, 409);
 
     const account = await createLineAccount(c.env.DB, {
-      channelId: body.channelId,
-      name: body.name,
-      channelAccessToken: body.channelAccessToken,
-      channelSecret: body.channelSecret,
+      channelId,
+      name,
+      channelAccessToken,
+      channelSecret,
       loginChannelId,
       loginChannelSecret,
       liffId,
@@ -426,6 +437,10 @@ lineAccounts.patch(
       const ogSiteName = normalizeOptionalString(body.ogSiteName);
       const ogDefaultImageUrl = normalizeOptionalString(body.ogDefaultImageUrl);
       const ogDefaultDescription = normalizeOptionalString(body.ogDefaultDescription);
+      const name = body.name === undefined ? undefined : normalizeRequiredString(body.name);
+      if (body.name !== undefined && !name) {
+        return c.json({ success: false, error: 'name is required' }, 400);
+      }
 
       // Pre-validate Login pair + uniqueness against the existing row so the
       // caller gets a clean error before we mutate. Skip the lookup entirely
@@ -472,7 +487,7 @@ lineAccounts.patch(
         touchesOg;
 
       // Route to the fields helper when name is not being changed.
-      if (body.name === undefined && fieldsTouched) {
+      if (name === undefined && fieldsTouched) {
         const updated = await updateLineAccountFields(c.env.DB, id, {
           country,
           role,
@@ -490,7 +505,7 @@ lineAccounts.patch(
 
       // name is present — use the full updateLineAccount path
       const updated = await updateLineAccount(c.env.DB, id, {
-        name: body.name,
+        name,
         is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
         login_channel_id: loginChannelId,
         login_channel_secret: loginChannelSecret,
@@ -542,6 +557,22 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
     const ogSiteName = normalizeOptionalString(body.ogSiteName);
     const ogDefaultImageUrl = normalizeOptionalString(body.ogDefaultImageUrl);
     const ogDefaultDescription = normalizeOptionalString(body.ogDefaultDescription);
+    const name = body.name === undefined ? undefined : normalizeRequiredString(body.name);
+    const channelAccessToken = body.channelAccessToken === undefined
+      ? undefined
+      : normalizeRequiredString(body.channelAccessToken);
+    const channelSecret = body.channelSecret === undefined
+      ? undefined
+      : normalizeRequiredString(body.channelSecret);
+    if (body.name !== undefined && !name) {
+      return c.json({ success: false, error: 'name is required' }, 400);
+    }
+    if (body.channelAccessToken !== undefined && !channelAccessToken) {
+      return c.json({ success: false, error: 'channelAccessToken is required' }, 400);
+    }
+    if (body.channelSecret !== undefined && !channelSecret) {
+      return c.json({ success: false, error: 'channelSecret is required' }, 400);
+    }
 
     // Validate Login pair + uniqueness identically to PATCH. PUT is the
     // owner-only credential rotation endpoint, so the same correctness
@@ -570,9 +601,9 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
     // helper from the credentials/name path. Skip whichever step has nothing
     // to do so we don't bump updated_at gratuitously.
     const credentialsTouched =
-      body.name !== undefined ||
-      body.channelAccessToken !== undefined ||
-      body.channelSecret !== undefined ||
+      name !== undefined ||
+      channelAccessToken !== undefined ||
+      channelSecret !== undefined ||
       loginChannelId !== undefined ||
       loginChannelSecret !== undefined ||
       liffId !== undefined ||
@@ -580,9 +611,9 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
 
     let updated = credentialsTouched
       ? await updateLineAccount(c.env.DB, id, {
-          name: body.name,
-          channel_access_token: body.channelAccessToken,
-          channel_secret: body.channelSecret,
+          name,
+          channel_access_token: channelAccessToken,
+          channel_secret: channelSecret,
           login_channel_id: loginChannelId,
           login_channel_secret: loginChannelSecret,
           liff_id: liffId,

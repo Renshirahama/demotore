@@ -84,7 +84,7 @@ export default function EventsListPage() {
             {items.map((e) => (
               <Link
                 key={e.id}
-                href={`/events/edit?id=${e.id}`}
+                href={`/events/edit?id=${encodeURIComponent(e.id)}`}
                 className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
               >
                 {e.image_url ? (

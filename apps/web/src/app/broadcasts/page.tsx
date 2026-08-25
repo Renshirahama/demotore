@@ -269,7 +269,7 @@ function BroadcastList() {
                     <td className="px-4 py-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <a href={`/broadcasts?id=${broadcast.id}`} className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                          <a href={`/broadcasts?id=${encodeURIComponent(broadcast.id)}`} className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline">
                             {broadcast.title}
                           </a>
                           {isDedup && (

@@ -21,7 +21,7 @@ interface Props {
 // last column opens an inline tag editor (handled by the parent table).
 export default function FriendListRow({ friend, onTagEditClick }: Props) {
   const router = useRouter()
-  const navigateToChat = () => router.push(`/chats?friend=${friend.id}`)
+  const navigateToChat = () => router.push(`/chats?friend=${encodeURIComponent(friend.id)}`)
   const incoming = friend.latestIncomingMessage
   const scenario = friend.activeScenario
   const isFollowing = friend.isFollowing

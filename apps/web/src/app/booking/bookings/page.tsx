@@ -232,7 +232,7 @@ export default function BookingsPage() {
                     <td className="px-4 py-3 text-sm whitespace-nowrap">{formatJpDateTime(b.starts_at)}</td>
                     <td className="px-4 py-3 text-sm">
                       <Link
-                        href={`/chats?friend=${b.friend_id}`}
+                        href={`/chats?friend=${encodeURIComponent(b.friend_id)}`}
                         className="text-blue-600 hover:underline"
                       >
                         {b.friend_name ?? '-'}

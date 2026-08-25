@@ -13,6 +13,9 @@ const dbMocks = {
   updateLineAccountFields: vi.fn(),
   updateLineAccountOrder: vi.fn(),
   deleteLineAccount: vi.fn(),
+  getTrafficPoolBySlug: vi.fn(),
+  createTrafficPool: vi.fn(),
+  addPoolAccount: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -79,6 +82,8 @@ const fakeAccount = {
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
   lineClientMocks.getFollowersInsight.mockReset();
+  dbMocks.getTrafficPoolBySlug.mockResolvedValue({ id: 'pool-main' });
+  dbMocks.addPoolAccount.mockResolvedValue(undefined);
 });
 
 describe('GET /api/line-accounts/:id/follower-insight', () => {
@@ -219,6 +224,47 @@ describe('POST /api/line-accounts', () => {
       loginChannelSecret: 'login-secret',
       liffId: null,
     });
+  });
+
+  test('trims required Messaging fields before creating the account', async () => {
+    dbMocks.createLineAccount.mockResolvedValue(fakeAccount);
+
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channelId: '  123456789  ',
+        name: '  メイン  ',
+        channelAccessToken: '  token  ',
+        channelSecret: '  secret  ',
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
+      channelId: '123456789',
+      name: 'メイン',
+      channelAccessToken: 'token',
+      channelSecret: 'secret',
+    });
+  });
+
+  test('rejects whitespace-only required Messaging fields', async () => {
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channelId: '123456789',
+        name: '   ',
+        channelAccessToken: 'token',
+        channelSecret: 'secret',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
 });
 

@@ -100,7 +100,7 @@ export default function ScenariosPage() {
       deliveryMode: input.deliveryMode,
     })
     if (res.success) {
-      router.push(`/scenarios/detail?id=${res.data.id}`)
+      router.push(`/scenarios/detail?id=${encodeURIComponent(res.data.id)}`)
     } else {
       throw new Error(res.error)
     }

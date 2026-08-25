@@ -54,7 +54,7 @@ export default function NewRichMenuPage() {
         const file = await fetchPresetFile(tmpl.imagePath, tmpl.key)
         await api.richMenuGroups.uploadImage(res.data.id, firstPageId, file)
       }
-      router.push(`/rich-menus/edit?id=${res.data.id}`)
+      router.push(`/rich-menus/edit?id=${encodeURIComponent(res.data.id)}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setSubmitting(false)

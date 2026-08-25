@@ -155,7 +155,7 @@ export default function BookingStaffPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">
                         <button onClick={() => setEditing(s)} className="text-blue-600 hover:underline">編集</button>
-                        <Link href={`/booking/staff/shifts?staff_id=${s.id}`} className="text-blue-600 hover:underline">
+                        <Link href={`/booking/staff/shifts?staff_id=${encodeURIComponent(s.id)}`} className="text-blue-600 hover:underline">
                           シフト
                         </Link>
                         <button onClick={() => remove(s.id)} className="text-red-600 hover:underline">削除</button>

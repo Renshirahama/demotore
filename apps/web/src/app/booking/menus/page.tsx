@@ -180,7 +180,7 @@ export default function MenusPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">
                         <button onClick={() => setEditing(m)} className="text-blue-600 hover:underline">編集</button>
-                        <Link href={`/booking/menus/staff?menu_id=${m.id}`} className="text-blue-600 hover:underline">
+                        <Link href={`/booking/menus/staff?menu_id=${encodeURIComponent(m.id)}`} className="text-blue-600 hover:underline">
                           スタッフ割当
                         </Link>
                         {!liffId ? (

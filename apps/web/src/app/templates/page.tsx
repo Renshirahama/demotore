@@ -576,7 +576,7 @@ export default function TemplatesPage() {
                         ))}
                         {scenarioStepUsages.map((ss) => (
                           <li key={`ss-${ss.stepId}`}>
-                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-blue-600 hover:underline">
+                            <a href={`/scenarios/detail?id=${encodeURIComponent(ss.scenarioId)}`} className="text-blue-600 hover:underline">
                               🎬 シナリオ: {ss.scenarioName} <span className="text-gray-400">#{ss.stepOrder}</span>
                             </a>
                           </li>

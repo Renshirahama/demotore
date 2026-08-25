@@ -460,7 +460,7 @@ export default function InflowLinksPage() {
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
                       {r.source === 'entry_route' && r.entryRouteId ? (
                         <Link
-                          href={`/inflow-links/detail?id=${r.entryRouteId}`}
+                          href={`/inflow-links/detail?id=${encodeURIComponent(r.entryRouteId)}`}
                           className="text-blue-600 hover:underline"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -660,7 +660,7 @@ function FragmentRow({
                   {friends.map((f) => (
                     <Link
                       key={f.id}
-                      href={`/chats?friend=${f.id}`}
+                      href={`/chats?friend=${encodeURIComponent(f.id)}`}
                       className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100 hover:border-blue-300"
                     >
                       <span className="text-sm text-gray-800 font-medium truncate">

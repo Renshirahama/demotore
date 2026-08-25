@@ -181,7 +181,7 @@ export default function AccountEditModal({
           />
 
           <AccountSetupUrls
-            liffId={state.liffId.trim() || initialLiffId || null}
+            liffId={state.liffId.trim() || null}
             heading="このアカで使う URL（LINE Developers Console に貼る）"
           />
 

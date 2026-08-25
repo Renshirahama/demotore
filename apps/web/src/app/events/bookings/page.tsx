@@ -130,7 +130,7 @@ function BookingsInner() {
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Link href="/events" className="text-blue-600 hover:underline">イベント一覧</Link>
           <span className="text-gray-400">/</span>
-          <Link href={`/events/edit?id=${eventId}`} className="text-blue-600 hover:underline">
+          <Link href={`/events/edit?id=${encodeURIComponent(eventId)}`} className="text-blue-600 hover:underline">
             {event?.name ?? '編集'}
           </Link>
           <span className="text-gray-400">/</span>

@@ -231,7 +231,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         </div>
         {eventId && (
           <a
-            href={`/events/bookings?id=${eventId}`}
+            href={`/events/bookings?id=${encodeURIComponent(eventId)}`}
             className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
           >
             予約を確認
@@ -302,7 +302,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                         </div>
                       )
                     }
-                    const url = `https://liff.line.me/${acct.liffId}/?page=event&id=${eventId}&liffId=${acct.liffId}`
+                    const encodedLiffId = encodeURIComponent(acct.liffId)
+                    const url = `https://liff.line.me/${encodedLiffId}/?page=event&id=${encodeURIComponent(eventId)}&liffId=${encodedLiffId}`
                     return (
                       <div key={a.id} className="flex items-center gap-2">
                         <span className="text-xs text-gray-600 min-w-[80px] truncate">
