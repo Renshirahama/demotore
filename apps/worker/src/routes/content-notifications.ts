@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 
 const REBNISE_CHANNEL_ID = '2010886778';
 const REBNISE_RSS_URL = 'https://www.rebnise.jp/RSS.rdf';
+const REBNISE_OGP_IMAGE_URL = 'https://www.rebnise.jp/files/user/_/common/img/libs/icon_ogp.png';
 const MAX_LINE_TEXT_LENGTH = 5000;
 
 type LineAccountRow = {
@@ -144,7 +145,12 @@ export async function sendContentNotification(
     url: cleanString(payload.url),
     contentType: cleanString(payload.contentType),
   });
-  const message: Message = { type: 'text', text: messageText };
+  const message = buildContentNotificationMessage({
+    title,
+    summary: cleanString(payload.summary),
+    url: cleanString(payload.url),
+    contentType: cleanString(payload.contentType),
+  });
   const dryRun = Boolean(payload.dryRun);
   const force = Boolean(payload.force);
   const isTargetedTest = Boolean(cleanString(payload.friendId));
@@ -194,9 +200,15 @@ export async function sendContentNotification(
       await db.prepare(
         `INSERT INTO messages_log
           (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at)
-         VALUES (?, ?, 'outgoing', 'text', ?, NULL, NULL, 'push', 'content-published', ?, datetime('now'))`,
+         VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'push', 'content-published', ?, datetime('now'))`,
       )
-        .bind(crypto.randomUUID(), recipient.id, messageText, account.id)
+        .bind(
+          crypto.randomUUID(),
+          recipient.id,
+          message.type === 'flex' ? 'flex' : 'text',
+          message.type === 'flex' ? JSON.stringify(message.contents) : messageText,
+          account.id,
+        )
         .run();
     } catch (err) {
       failed += 1;
@@ -492,14 +504,113 @@ function buildContentNotificationText(input: {
 }): string {
   const label = contentTypeLabel(input.contentType);
   const lines = [
-    '【新着のお知らせ】',
-    `${label}が公開されました。`,
+    '【新着きてます】',
+    `${label}をサクッとチェック。`,
     '',
     input.title,
-    input.summary ? `\n${input.summary.slice(0, 600)}` : '',
+    input.summary ? `\n${input.summary.slice(0, 220)}` : '',
     input.url ? `\n${input.url}` : '',
   ];
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').slice(0, MAX_LINE_TEXT_LENGTH);
+}
+
+function buildContentNotificationMessage(input: {
+  title: string;
+  summary: string;
+  url: string;
+  contentType: string;
+}): Message {
+  const url = safeHttpsUrl(input.url);
+  if (!url) return { type: 'text', text: buildContentNotificationText(input) };
+
+  const label = contentTypeLabel(input.contentType);
+  const title = input.title.slice(0, 120);
+  const summary = (input.summary || 'レブナイズの新着情報が公開されました。気になる内容をチェックしてみてください。')
+    .replace(/\s+/g, ' ')
+    .slice(0, 160);
+
+  return {
+    type: 'flex',
+    altText: `${label}: ${title}`.slice(0, 400),
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      hero: {
+        type: 'image',
+        url: REBNISE_OGP_IMAGE_URL,
+        size: 'full',
+        aspectRatio: '20:9',
+        aspectMode: 'cover',
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: '新着きてます',
+            weight: 'bold',
+            color: '#E60033',
+            size: 'sm',
+          },
+          {
+            type: 'text',
+            text: title,
+            weight: 'bold',
+            size: 'xl',
+            color: '#111111',
+            wrap: true,
+          },
+          {
+            type: 'text',
+            text: summary,
+            size: 'sm',
+            color: '#555555',
+            wrap: true,
+            margin: 'sm',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            color: '#E60033',
+            height: 'sm',
+            action: {
+              type: 'uri',
+              label: '記事を見る',
+              uri: url,
+            },
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            height: 'sm',
+            action: {
+              type: 'uri',
+              label: 'ニュース一覧',
+              uri: 'https://www.rebnise.jp/news/',
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+function safeHttpsUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : '';
+  } catch {
+    return '';
+  }
 }
 
 async function resolveLineAccount(db: D1Database, payload: ContentPayload): Promise<LineAccountRow | null> {
