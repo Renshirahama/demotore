@@ -3,6 +3,7 @@ import { LineClient, type Message } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 
 const REBNISE_CHANNEL_ID = '2010886778';
+const REBNISE_RSS_URL = 'https://www.rebnise.jp/RSS.rdf';
 const MAX_LINE_TEXT_LENGTH = 5000;
 
 type LineAccountRow = {
@@ -33,12 +34,45 @@ type ContentPayload = {
   force?: unknown;
 };
 
+type ContentNotificationResult = {
+  success: boolean;
+  dryRun?: boolean;
+  skipped?: boolean;
+  reason?: string;
+  contentId?: string;
+  account?: { id: string; name: string | null };
+  recipients?: number;
+  sent?: number;
+  failed?: number;
+  errors?: Array<{ friendId: string; message: string }>;
+  message?: string;
+};
+
+type RssEntry = {
+  id: string;
+  title: string;
+  summary: string;
+  url: string;
+  updatedAt: string;
+};
+
+type RssSyncResult = {
+  success: boolean;
+  source: string;
+  mode: 'baseline' | 'dry-run' | 'send';
+  fetched: number;
+  candidates: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  errors: Array<{ contentId: string; error: string }>;
+  latestUpdatedAt: string | null;
+};
+
 export const contentNotifications = new Hono<Env>();
 
 contentNotifications.post('/api/line/content-published', async (c) => {
-  const configuredSecret = c.env.INTERNAL_NOTIFY_SECRET || c.env.CRON_SECRET;
-  const providedSecret = c.req.header('x-internal-secret') || c.req.query('secret');
-  if (!configuredSecret || providedSecret !== configuredSecret) {
+  if (!isValidInternalRequest(c.env, c.req.header('x-internal-secret') || c.req.query('secret'))) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
@@ -54,23 +88,53 @@ contentNotifications.post('/api/line/content-published', async (c) => {
     return c.json({ success: false, error: 'title is required' }, 400);
   }
 
-  const account = await resolveLineAccount(c.env.DB, payload);
-  if (!account) {
-    return c.json({ success: false, error: 'Active LINE account not found' }, 404);
-  }
-  if (!account.channel_access_token && !c.env.LINE_CHANNEL_ACCESS_TOKEN) {
-    return c.json({ success: false, error: 'LINE channel access token is not configured' }, 500);
+  const result = await sendContentNotification(c.env.DB, c.env, payload);
+  const status = result.success ? 200 : result.failed && result.failed > 0 && result.sent && result.sent > 0 ? 207 : 500;
+  return c.json(result, status);
+});
+
+contentNotifications.post('/api/line/cron/rebnise-content-sync', async (c) => {
+  if (!isValidInternalRequest(c.env, c.req.header('x-internal-secret') || c.req.query('secret'))) {
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
-  const recipients = await resolveRecipients(c.env.DB, account.id, cleanString(payload.friendId));
+  let body: { dryRun?: unknown; forceBaseline?: unknown } = {};
+  try {
+    body = await c.req.json();
+  } catch {
+    body = {};
+  }
+
+  const result = await syncRebniseRssContent(c.env.DB, c.env, {
+    dryRun: Boolean(body.dryRun),
+    forceBaseline: Boolean(body.forceBaseline),
+  });
+  return c.json(result, result.success ? 200 : 500);
+});
+
+export async function sendContentNotification(
+  db: D1Database,
+  env: Pick<Env['Bindings'], 'LINE_CHANNEL_ACCESS_TOKEN'>,
+  payload: ContentPayload,
+): Promise<ContentNotificationResult> {
+  const title = cleanString(payload.title);
+  if (!title) return { success: false, reason: 'title_required' };
+
+  const account = await resolveLineAccount(db, payload);
+  if (!account) return { success: false, reason: 'account_not_found' };
+  if (!account.channel_access_token && !env.LINE_CHANNEL_ACCESS_TOKEN) {
+    return { success: false, reason: 'line_token_missing', account: { id: account.id, name: account.name } };
+  }
+
+  const recipients = await resolveRecipients(db, account.id, cleanString(payload.friendId));
   if (recipients.length === 0) {
-    return c.json({
+    return {
       success: true,
       skipped: true,
       reason: 'no_recipients',
       account: { id: account.id, name: account.name },
       recipients: 0,
-    });
+    };
   }
 
   const contentId = contentIdForPayload(payload, title);
@@ -85,10 +149,10 @@ contentNotifications.post('/api/line/content-published', async (c) => {
   const force = Boolean(payload.force);
   const isTargetedTest = Boolean(cleanString(payload.friendId));
 
-  await ensureContentNotificationsTable(c.env.DB);
+  await ensureContentNotificationsTable(db);
 
   if (!dryRun && !force && !isTargetedTest) {
-    const inserted = await tryCreateContentNotification(c.env.DB, {
+    const inserted = await tryCreateContentNotification(db, {
       lineAccountId: account.id,
       contentId,
       title,
@@ -96,29 +160,29 @@ contentNotifications.post('/api/line/content-published', async (c) => {
       messageText,
     });
     if (!inserted) {
-      return c.json({
+      return {
         success: true,
         skipped: true,
         reason: 'already_sent',
         contentId,
         account: { id: account.id, name: account.name },
         recipients: recipients.length,
-      });
+      };
     }
   }
 
   if (dryRun) {
-    return c.json({
+    return {
       success: true,
       dryRun: true,
       contentId,
       account: { id: account.id, name: account.name },
       recipients: recipients.length,
       message: messageText,
-    });
+    };
   }
 
-  const client = new LineClient(account.channel_access_token || c.env.LINE_CHANNEL_ACCESS_TOKEN);
+  const client = new LineClient(account.channel_access_token || env.LINE_CHANNEL_ACCESS_TOKEN);
   let sent = 0;
   let failed = 0;
   const errors: Array<{ friendId: string; message: string }> = [];
@@ -127,7 +191,7 @@ contentNotifications.post('/api/line/content-published', async (c) => {
     try {
       await client.pushMessage(recipient.line_user_id, [message]);
       sent += 1;
-      await c.env.DB.prepare(
+      await db.prepare(
         `INSERT INTO messages_log
           (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at)
          VALUES (?, ?, 'outgoing', 'text', ?, NULL, NULL, 'push', 'content-published', ?, datetime('now'))`,
@@ -143,7 +207,7 @@ contentNotifications.post('/api/line/content-published', async (c) => {
     }
   }
 
-  await upsertContentNotificationStats(c.env.DB, {
+  await upsertContentNotificationStats(db, {
     lineAccountId: account.id,
     contentId,
     title,
@@ -153,7 +217,7 @@ contentNotifications.post('/api/line/content-published', async (c) => {
     failed,
   });
 
-  return c.json({
+  return {
     success: failed === 0,
     contentId,
     account: { id: account.id, name: account.name },
@@ -161,8 +225,245 @@ contentNotifications.post('/api/line/content-published', async (c) => {
     sent,
     failed,
     errors,
-  }, failed === 0 ? 200 : 207);
-});
+  };
+}
+
+export async function syncRebniseRssContent(
+  db: D1Database,
+  env: Pick<Env['Bindings'], 'LINE_CHANNEL_ACCESS_TOKEN'>,
+  options: { dryRun?: boolean; forceBaseline?: boolean } = {},
+): Promise<RssSyncResult> {
+  await ensureContentNotificationsTable(db);
+  await ensureContentSyncStateTable(db);
+
+  const source = 'rebnise-rss';
+  const entries = await fetchRebniseRssEntries();
+  const latestUpdatedAt = entries.reduce<string | null>((latest, entry) => {
+    if (!entry.updatedAt) return latest;
+    return !latest || new Date(entry.updatedAt).getTime() > new Date(latest).getTime() ? entry.updatedAt : latest;
+  }, null);
+
+  const state = await db
+    .prepare('SELECT last_seen_updated_at FROM content_sync_state WHERE source = ? LIMIT 1')
+    .bind(source)
+    .first<{ last_seen_updated_at: string | null }>();
+
+  if (!state || options.forceBaseline) {
+    await baselineEntries(db, entries);
+    await upsertContentSyncState(db, source, latestUpdatedAt);
+    return {
+      success: true,
+      source,
+      mode: 'baseline',
+      fetched: entries.length,
+      candidates: 0,
+      sent: 0,
+      failed: 0,
+      skipped: entries.length,
+      errors: [],
+      latestUpdatedAt,
+    };
+  }
+
+  const lastSeenMs = state.last_seen_updated_at ? new Date(state.last_seen_updated_at).getTime() : 0;
+  const candidates = entries
+    .filter((entry) => !entry.updatedAt || new Date(entry.updatedAt).getTime() > lastSeenMs)
+    .sort((a, b) => new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime());
+
+  const result: RssSyncResult = {
+    success: true,
+    source,
+    mode: options.dryRun ? 'dry-run' : 'send',
+    fetched: entries.length,
+    candidates: candidates.length,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    errors: [],
+    latestUpdatedAt,
+  };
+
+  for (const entry of candidates) {
+    try {
+      const sendResult = await sendContentNotification(db, env, {
+        id: entry.id || entry.url,
+        title: entry.title,
+        summary: entry.summary,
+        url: entry.url,
+        publishedAt: entry.updatedAt,
+        contentType: inferContentType(entry),
+        dryRun: options.dryRun,
+      });
+      result.sent += sendResult.sent ?? 0;
+      result.failed += sendResult.failed ?? 0;
+      if (sendResult.skipped) result.skipped += 1;
+      if (!sendResult.success) {
+        result.success = false;
+        result.errors.push({ contentId: entry.id || entry.url, error: sendResult.reason || 'send_failed' });
+      }
+    } catch (err) {
+      result.success = false;
+      result.failed += 1;
+      result.errors.push({
+        contentId: entry.id || entry.url,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  if (!options.dryRun) {
+    await upsertContentSyncState(db, source, latestUpdatedAt ?? state.last_seen_updated_at);
+  }
+
+  return result;
+}
+
+function isValidInternalRequest(
+  env: Pick<Env['Bindings'], 'INTERNAL_NOTIFY_SECRET' | 'CRON_SECRET'>,
+  providedSecret: string | undefined,
+): boolean {
+  const configuredSecret = env.INTERNAL_NOTIFY_SECRET || env.CRON_SECRET;
+  return Boolean(configuredSecret && providedSecret && providedSecret === configuredSecret);
+}
+
+async function fetchRebniseRssEntries(): Promise<RssEntry[]> {
+  const response = await fetch(REBNISE_RSS_URL, {
+    headers: {
+      Accept: 'application/atom+xml, application/rss+xml, text/xml;q=0.9, */*;q=0.1',
+      'User-Agent': 'LineHarnessRebniseContentSync/1.0',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Rebnise RSS: ${response.status}`);
+  }
+
+  const xml = await response.text();
+  return parseAtomEntries(xml).slice(0, 20);
+}
+
+function parseAtomEntries(xml: string): RssEntry[] {
+  const entries: RssEntry[] = [];
+  const entryPattern = /<entry\b[\s\S]*?<\/entry>/gi;
+  const blocks = xml.match(entryPattern) ?? [];
+
+  for (const block of blocks) {
+    const id = xmlText(block, 'id');
+    const title = stripHtml(xmlText(block, 'title'));
+    const summary = stripHtml(xmlText(block, 'summary') || xmlText(block, 'content')).slice(0, 700);
+    const updatedAt = xmlText(block, 'updated') || xmlText(block, 'published');
+    const link = linkHref(block) || id;
+    if (!title || !link) continue;
+    entries.push({ id: id || link, title, summary, url: link, updatedAt });
+  }
+
+  return entries;
+}
+
+function xmlText(block: string, tag: string): string {
+  const pattern = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
+  const match = block.match(pattern);
+  return match ? decodeEntities(stripCdata(match[1]).trim()) : '';
+}
+
+function linkHref(block: string): string {
+  const alternate = block.match(/<link\b[^>]*rel=["']alternate["'][^>]*href=["']([^"']+)["'][^>]*\/?>/i);
+  if (alternate) return decodeEntities(alternate[1]);
+  const anyLink = block.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*\/?>/i);
+  return anyLink ? decodeEntities(anyLink[1]) : '';
+}
+
+function stripCdata(value: string): string {
+  return value.replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '');
+}
+
+function stripHtml(value: string): string {
+  return decodeEntities(
+    value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\r/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
+  );
+}
+
+function decodeEntities(value: string): string {
+  const named: Record<string, string> = {
+    amp: '&',
+    lt: '<',
+    gt: '>',
+    quot: '"',
+    apos: "'",
+    nbsp: ' ',
+  };
+  return value
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (_whole, entity: string) => {
+      const lower = entity.toLowerCase();
+      if (lower.startsWith('#x')) return String.fromCodePoint(Number.parseInt(lower.slice(2), 16));
+      if (lower.startsWith('#')) return String.fromCodePoint(Number.parseInt(lower.slice(1), 10));
+      return named[lower] ?? `&${entity};`;
+    })
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n');
+}
+
+function inferContentType(entry: RssEntry): string {
+  const text = `${entry.title} ${entry.url}`.toLowerCase();
+  if (text.includes('column') || text.includes('コラム')) return 'コラム';
+  if (text.includes('blog') || text.includes('ブログ')) return 'ブログ';
+  if (text.includes('event') || text.includes('イベント')) return 'イベント';
+  if (text.includes('ticket') || text.includes('チケット')) return 'お知らせ';
+  return 'お知らせ';
+}
+
+async function ensureContentSyncStateTable(db: D1Database): Promise<void> {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS content_sync_state (
+        source TEXT PRIMARY KEY,
+        last_seen_updated_at TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+    )
+    .run();
+}
+
+async function upsertContentSyncState(
+  db: D1Database,
+  source: string,
+  lastSeenUpdatedAt: string | null,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO content_sync_state (source, last_seen_updated_at, updated_at)
+       VALUES (?, ?, datetime('now'))
+       ON CONFLICT(source) DO UPDATE SET
+        last_seen_updated_at = excluded.last_seen_updated_at,
+        updated_at = datetime('now')`,
+    )
+    .bind(source, lastSeenUpdatedAt)
+    .run();
+}
+
+async function baselineEntries(db: D1Database, entries: RssEntry[]): Promise<void> {
+  const account = await resolveLineAccount(db, { channelId: REBNISE_CHANNEL_ID });
+  if (!account) return;
+  for (const entry of entries) {
+    await tryCreateContentNotification(db, {
+      lineAccountId: account.id,
+      contentId: entry.id || entry.url,
+      title: entry.title,
+      url: entry.url,
+      messageText: buildContentNotificationText({
+        title: entry.title,
+        summary: entry.summary,
+        url: entry.url,
+        contentType: inferContentType(entry),
+      }),
+    });
+  }
+}
 
 function cleanString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';

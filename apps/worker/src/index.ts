@@ -78,7 +78,7 @@ import { messageTemplates } from './routes/message-templates.js';
 import dedupPreview from './routes/dedup-preview.js';
 import { profileRefresh } from './routes/profile-refresh.js';
 import { richMenuGroups } from './routes/rich-menu-groups.js';
-import { contentNotifications } from './routes/content-notifications.js';
+import { contentNotifications, syncRebniseRssContent } from './routes/content-notifications.js';
 import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -952,6 +952,7 @@ async function scheduled(
   );
   jobs.push(processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL));
   jobs.push(checkAccountHealth(env.DB));
+  jobs.push(syncRebniseRssContent(env.DB, env));
 
   await Promise.allSettled(jobs);
 
