@@ -78,6 +78,7 @@ import { messageTemplates } from './routes/message-templates.js';
 import dedupPreview from './routes/dedup-preview.js';
 import { profileRefresh } from './routes/profile-refresh.js';
 import { richMenuGroups } from './routes/rich-menu-groups.js';
+import { contentNotifications } from './routes/content-notifications.js';
 import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -97,6 +98,8 @@ export type Env = {
     LINE_CHANNEL_ACCESS_TOKEN: string;
     API_KEY: string;
     LEGACY_API_KEY?: string;
+    INTERNAL_NOTIFY_SECRET?: string;
+    CRON_SECRET?: string;
     LIFF_URL: string;
     LINE_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_ID: string;
@@ -143,7 +146,7 @@ app.use('*', cors({
   origin: (origin, c) => resolveCorsOrigin(c.env, origin, c.req.url),
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'x-admin-api-key'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'x-admin-api-key', 'x-internal-secret'],
   maxAge: 600,
 }));
 
@@ -202,6 +205,7 @@ app.route('/', messageTemplates);
 app.route('/', dedupPreview);
 app.route('/', profileRefresh);
 app.route('/', richMenuGroups);
+app.route('/', contentNotifications);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
