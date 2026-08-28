@@ -421,11 +421,21 @@ function decodeEntities(value: string): string {
 }
 
 function inferContentType(entry: RssEntry): string {
-  const text = `${entry.title} ${entry.url}`.toLowerCase();
+  const url = entry.url.toLowerCase();
+  const text = `${entry.title} ${entry.summary} ${entry.url}`.toLowerCase();
+
+  // Rebnise publishes several content types outside /news/. Use the site's
+  // URL hierarchy first, then fall back to title/summary keywords.
+  if (url.includes('/sponsor')) return 'スポンサー情報';
+  if (url.includes('/fanclub')) return 'ファンクラブ情報';
+  if (url.includes('/ticket')) return 'チケット情報';
+  if (url.includes('/academy')) return 'アカデミー情報';
+  if (url.includes('/team/players') || url.includes('/team/')) return 'チーム情報';
+  if (url.includes('/company')) return 'クラブ情報';
   if (text.includes('column') || text.includes('コラム')) return 'コラム';
   if (text.includes('blog') || text.includes('ブログ')) return 'ブログ';
-  if (text.includes('event') || text.includes('イベント')) return 'イベント';
-  if (text.includes('ticket') || text.includes('チケット')) return 'お知らせ';
+  if (text.includes('event') || text.includes('イベント')) return 'イベント情報';
+  if (text.includes('ticket') || text.includes('チケット')) return 'チケット情報';
   return 'お知らせ';
 }
 
@@ -493,6 +503,12 @@ function contentTypeLabel(contentType: string): string {
   if (['blog', 'blogs', 'ブログ'].includes(normalized)) return 'ブログ';
   if (['news', 'お知らせ', 'notice'].includes(normalized)) return 'お知らせ';
   if (['event', 'events', 'イベント'].includes(normalized)) return 'イベント情報';
+  if (normalized.includes('sponsor') || normalized.includes('スポンサー')) return 'スポンサー情報';
+  if (normalized.includes('fanclub') || normalized.includes('ファンクラブ')) return 'ファンクラブ情報';
+  if (normalized.includes('ticket') || normalized.includes('チケット')) return 'チケット情報';
+  if (normalized.includes('academy') || normalized.includes('アカデミー')) return 'アカデミー情報';
+  if (normalized.includes('team') || normalized.includes('チーム')) return 'チーム情報';
+  if (normalized.includes('club') || normalized.includes('クラブ')) return 'クラブ情報';
   return contentType || '新しい投稿';
 }
 
@@ -633,6 +649,12 @@ function safeHttpsUrl(value: string): string {
 
 function buildTopicLine(title: string, summary: string, label: string): string {
   const source = `${title} ${summary}`.replace(/\s+/g, ' ');
+  if (label === 'スポンサー情報') return 'スポンサー・パートナー向け情報';
+  if (label === 'ファンクラブ情報') return 'ファンクラブ会員向け情報';
+  if (label === 'チケット情報') return 'チケット・観戦に関するお知らせ';
+  if (label === 'アカデミー情報') return 'アカデミーに関するお知らせ';
+  if (label === 'チーム情報') return 'チーム・選手に関するお知らせ';
+  if (label === 'クラブ情報') return 'クラブ運営に関するお知らせ';
   if (/チケット|招待|優待|席|観戦/.test(source)) return 'チケット・観戦に関するお知らせ';
   if (/試合|ホーム戦|節|vs|VS|対戦|GAME/i.test(source)) return '試合に関するお知らせ';
   if (/イベント|FES|フェス|開催/.test(source)) return 'イベント開催のお知らせ';
@@ -647,6 +669,12 @@ function buildTopicLine(title: string, summary: string, label: string): string {
 
 function buildHookLine(title: string, summary: string, label: string): string {
   const source = `${title} ${summary}`;
+  if (label === 'スポンサー情報') return 'スポンサー企業のみなさま向けの最新トピックです。';
+  if (label === 'ファンクラブ情報') return '会員の方は内容をチェック。';
+  if (label === 'チケット情報') return '観戦予定の方は早めにチェック。';
+  if (label === 'アカデミー情報') return '参加を検討中の方は内容をチェック。';
+  if (label === 'チーム情報') return 'チームの今を知れるニュースです。';
+  if (label === 'クラブ情報') return 'レブナイズの最新情報をお届けします。';
   if (/チケット|招待|優待|席|観戦/.test(source)) return '行く前にチェックしておきたい内容です。';
   if (/試合|ホーム戦|節|vs|VS|対戦|GAME/i.test(source)) return '試合前に見ておくと楽しみやすいです。';
   if (/イベント|FES|フェス|開催/.test(source)) return '参加予定の方は早めにチェック。';
