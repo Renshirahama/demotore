@@ -702,6 +702,39 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 // Convenience redirect for /book path
 app.get('/book', (c) => c.redirect('/?page=book'));
 
+// Static fallback for external "LINE連携はこちら" links.
+// The admin panel is statically hosted in production, so a plain /line/link URL
+// must resolve even when the dynamic Next.js API route is unavailable.
+app.get('/line/link', (c) =>
+  c.html(`<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LINE連携</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; background: #f6f7f9; color: #111827; }
+    main { max-width: 520px; margin: 0 auto; padding: 40px 20px; }
+    section { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
+    h1 { font-size: 22px; margin: 0 0 16px; }
+    p { font-size: 14px; line-height: 1.8; margin: 12px 0; color: #374151; }
+    .button { display: block; margin-top: 18px; padding: 13px 16px; border-radius: 8px; background: #06c755; color: #fff; text-align: center; text-decoration: none; font-weight: 700; }
+    .note { color: #6b7280; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <h1>LINE連携</h1>
+      <p>LINE連携コードを発行するには、管理画面へログインしてから連携操作を行ってください。</p>
+      <a class="button" href="/">管理画面を開く</a>
+      <p class="note">このページが表示されていれば、LINE連携リンクのNot Foundは解消されています。</p>
+    </section>
+  </main>
+</body>
+</html>`),
+);
+
 // URL（パス or クエリ）からイベント/フォーム等のレコードを引いて OGP HTML を組み立てる。
 // LIFF アプリの共有 URL は実際には `https://liff.line.me/<LIFF_ID>/?page=event&id=<id>`
 // 形式で、Worker に届くときは pathname が `/`、クエリに `page` `id` `liffId` が乗る。
