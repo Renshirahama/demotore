@@ -503,9 +503,11 @@ function buildContentNotificationText(input: {
   contentType: string;
 }): string {
   const label = contentTypeLabel(input.contentType);
+  const topic = buildTopicLine(input.title, input.summary, label);
+  const hook = buildHookLine(input.title, input.summary, label);
   const lines = [
-    '【新着きてます】',
-    `${label}をサクッとチェック。`,
+    `【${label}】${topic}`,
+    hook,
     '',
     input.title,
     input.summary ? `\n${input.summary.slice(0, 220)}` : '',
@@ -525,13 +527,13 @@ function buildContentNotificationMessage(input: {
 
   const label = contentTypeLabel(input.contentType);
   const title = input.title.slice(0, 120);
-  const summary = (input.summary || 'レブナイズの新着情報が公開されました。気になる内容をチェックしてみてください。')
-    .replace(/\s+/g, ' ')
-    .slice(0, 160);
+  const topic = buildTopicLine(input.title, input.summary, label);
+  const hook = buildHookLine(input.title, input.summary, label);
+  const summary = buildSummaryLine(input.summary, input.title);
 
   return {
     type: 'flex',
-    altText: `${label}: ${title}`.slice(0, 400),
+    altText: `${label}: ${topic}`.slice(0, 400),
     contents: {
       type: 'bubble',
       size: 'mega',
@@ -549,10 +551,18 @@ function buildContentNotificationMessage(input: {
         contents: [
           {
             type: 'text',
-            text: '新着きてます',
+            text: label,
             weight: 'bold',
             color: '#E60033',
             size: 'sm',
+          },
+          {
+            type: 'text',
+            text: topic,
+            weight: 'bold',
+            size: 'md',
+            color: '#333333',
+            wrap: true,
           },
           {
             type: 'text',
@@ -561,6 +571,14 @@ function buildContentNotificationMessage(input: {
             size: 'xl',
             color: '#111111',
             wrap: true,
+          },
+          {
+            type: 'text',
+            text: hook,
+            size: 'sm',
+            color: '#E60033',
+            wrap: true,
+            margin: 'sm',
           },
           {
             type: 'text',
@@ -584,7 +602,7 @@ function buildContentNotificationMessage(input: {
             height: 'sm',
             action: {
               type: 'uri',
-              label: '記事を見る',
+              label: `${label}を見る`.slice(0, 20),
               uri: url,
             },
           },
@@ -611,6 +629,40 @@ function safeHttpsUrl(value: string): string {
   } catch {
     return '';
   }
+}
+
+function buildTopicLine(title: string, summary: string, label: string): string {
+  const source = `${title} ${summary}`.replace(/\s+/g, ' ');
+  if (/チケット|招待|優待|席|観戦/.test(source)) return 'チケット・観戦に関するお知らせ';
+  if (/試合|ホーム戦|節|vs|VS|対戦|GAME/i.test(source)) return '試合に関するお知らせ';
+  if (/イベント|FES|フェス|開催/.test(source)) return 'イベント開催のお知らせ';
+  if (/スポンサー|パートナー|企業/.test(source)) return 'スポンサー・パートナー向け情報';
+  if (/グッズ|ユニフォーム|販売/.test(source)) return 'グッズ・ユニフォーム情報';
+  if (/選手|チーム|キャプテン|スタッフ|契約|加入|退団/.test(source)) return 'チーム情報のお知らせ';
+  if (/メディア|出演|放送|掲載/.test(source)) return 'メディア掲載のお知らせ';
+  if (label === 'コラム') return 'レブナイズを深く知れるコラム';
+  if (label === 'ブログ') return 'クラブの近況がわかるブログ';
+  return 'レブナイズの最新情報';
+}
+
+function buildHookLine(title: string, summary: string, label: string): string {
+  const source = `${title} ${summary}`;
+  if (/チケット|招待|優待|席|観戦/.test(source)) return '行く前にチェックしておきたい内容です。';
+  if (/試合|ホーム戦|節|vs|VS|対戦|GAME/i.test(source)) return '試合前に見ておくと楽しみやすいです。';
+  if (/イベント|FES|フェス|開催/.test(source)) return '参加予定の方は早めにチェック。';
+  if (/スポンサー|パートナー|企業/.test(source)) return 'スポンサー企業のみなさま向けの最新トピックです。';
+  if (/グッズ|ユニフォーム|販売/.test(source)) return '気になる人は売り切れ前にチェック。';
+  if (/選手|チーム|キャプテン|スタッフ|契約|加入|退団/.test(source)) return 'チームの今を知れるニュースです。';
+  if (label === 'コラム') return '読みものとしてサクッと追えます。';
+  return '気になる内容をカードからそのまま見られます。';
+}
+
+function buildSummaryLine(summary: string, title: string): string {
+  const cleaned = (summary || title)
+    .replace(/\s+/g, ' ')
+    .replace(/いつも鹿児島レブナイズの応援誠にありがとうございます。?/g, '')
+    .trim();
+  return (cleaned || 'レブナイズの新着情報が公開されました。').slice(0, 150);
 }
 
 async function resolveLineAccount(db: D1Database, payload: ContentPayload): Promise<LineAccountRow | null> {
