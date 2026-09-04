@@ -90,9 +90,19 @@ export async function processBroadcastSend(
       // Use LINE broadcast API (sends to all followers)
       const { requestId } = await lineClient.broadcast([message]);
       await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
-      // We don't have exact count for broadcast API, set as 0 (unknown)
-      totalCount = 0;
-      successCount = 0;
+      // LINE's broadcast endpoint does not return the recipient count, but the
+      // dashboard should not show a successful send as 0/0. Use the synced
+      // following count as the accepted-recipient estimate; fetch-insight can
+      // later replace it with LINE's delivered count.
+      const countSql = broadcastAccountId
+        ? 'SELECT COUNT(*) AS count FROM friends WHERE is_following = 1 AND line_account_id = ?'
+        : 'SELECT COUNT(*) AS count FROM friends WHERE is_following = 1';
+      const count = await db
+        .prepare(countSql)
+        .bind(...(broadcastAccountId ? [broadcastAccountId] : []))
+        .first<{ count: number }>();
+      totalCount = count?.count ?? 0;
+      successCount = totalCount;
     } else if (broadcast.target_type === 'tag') {
       if (!broadcast.target_tag_id) {
         throw new Error('target_tag_id is required for tag-targeted broadcasts');

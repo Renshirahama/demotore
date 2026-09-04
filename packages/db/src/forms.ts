@@ -56,12 +56,13 @@ export interface FormWithStats extends Form {
 }
 
 export async function getFormsWithStats(db: D1Database): Promise<FormWithStats[]> {
-  // Single query: forms + last submission + per-account submission counts.
+  // Single query: forms + actual submission count + last submission + per-account submission counts.
   // json_group_array returns '[]' (not NULL) when subquery yields no rows.
   const result = await db
     .prepare(
       `SELECT
          f.*,
+         (SELECT COUNT(*) FROM form_submissions WHERE form_id = f.id) AS actual_submit_count,
          (SELECT MAX(created_at) FROM form_submissions WHERE form_id = f.id) AS last_submitted_at,
          (SELECT json_group_array(
                    json_object(
@@ -83,10 +84,10 @@ export async function getFormsWithStats(db: D1Database): Promise<FormWithStats[]
        FROM forms f
        ORDER BY f.created_at DESC`,
     )
-    .all<Form & { last_submitted_at: string | null; used_by_accounts_json: string | null }>();
+    .all<Form & { actual_submit_count: number; last_submitted_at: string | null; used_by_accounts_json: string | null }>();
 
   return result.results.map((row) => {
-    const { used_by_accounts_json, ...rest } = row;
+    const { actual_submit_count, used_by_accounts_json, ...rest } = row;
     let parsed: FormUsedByAccount[] = [];
     if (used_by_accounts_json) {
       try {
@@ -96,15 +97,23 @@ export async function getFormsWithStats(db: D1Database): Promise<FormWithStats[]
         parsed = [];
       }
     }
-    return { ...rest, used_by_accounts: parsed };
+    return { ...rest, submit_count: actual_submit_count ?? 0, used_by_accounts: parsed };
   });
 }
 
 export async function getFormById(db: D1Database, id: string): Promise<Form | null> {
   return db
-    .prepare(`SELECT * FROM forms WHERE id = ?`)
+    .prepare(
+      `SELECT f.*, (SELECT COUNT(*) FROM form_submissions WHERE form_id = f.id) AS actual_submit_count
+         FROM forms f WHERE f.id = ?`,
+    )
     .bind(id)
-    .first<Form>();
+    .first<Form & { actual_submit_count: number }>()
+    .then((row) => {
+      if (!row) return null;
+      const { actual_submit_count, ...form } = row;
+      return { ...form, submit_count: actual_submit_count ?? 0 };
+    });
 }
 
 export interface CreateFormInput {
