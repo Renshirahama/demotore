@@ -158,6 +158,7 @@ VALUES
 INSERT INTO auto_replies
   (id, keyword, match_type, response_type, response_content, template_id, line_account_id, is_active, created_at)
 VALUES
+  ('autoreply-money-diagnosis-link', '相談タイプ診断', 'exact', 'text', '相談タイプ診断はこちらから進められます。\n\n3つの質問に答えると、AI導入・開発・AI研修のどの相談が近いかを案内します。\nhttps://liff.line.me/2010827320-GP2p6pPv?page=form&id=money-diagnosis-v1', NULL, (SELECT id FROM line_accounts WHERE channel_id = '2010827092'), 1, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   ('autoreply-money-course-info', 'サービスを見る', 'exact', 'text', 'ZETTAiでは、AIコンサルティング・DX支援、Web/iOS/AIプロダクトの企画・開発・運用、AI研修について相談できます。\n\nまずは相談タイプ診断で、今の状況に近い案内を確認してください。\nhttps://liff.line.me/2010827320-GP2p6pPv?page=form&id=money-diagnosis-v1', NULL, (SELECT id FROM line_accounts WHERE channel_id = '2010827092'), 1, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   ('autoreply-money-today-lesson', '導入事例', 'exact', 'text', '導入事例・実績については、担当者が相談内容に近い事例を確認して案内します。\n\nAI導入、開発、研修のどれに近いかを教えていただくとスムーズです。具体的に相談したい場合は「問い合わせしたい」と送ってください。', NULL, (SELECT id FROM line_accounts WHERE channel_id = '2010827092'), 1, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   ('autoreply-money-work', '資料請求', 'exact', 'text', '資料請求ありがとうございます。\n\n必要な資料を確認するため、以下をこのLINEに送ってください。\n1. 会社名\n2. お名前\n3. 知りたい内容（AI導入 / 開発 / AI研修 / その他）\n\n担当者が確認して案内します。', NULL, (SELECT id FROM line_accounts WHERE channel_id = '2010827092'), 1, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),

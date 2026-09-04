@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="1686" viewBox="0 0 2500 1686">
+  <defs>
+    <!-- 背景グラデーション -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0a0a"/>
+      <stop offset="100%" stop-color="#1a1008"/>
+    </linearGradient>
+    <!-- カードグラデーション -->
+    <linearGradient id="card-left" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1c1c1c"/>
+      <stop offset="100%" stop-color="#0f0f0f"/>
+    </linearGradient>
+    <linearGradient id="card-right" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1c1c1c"/>
+      <stop offset="100%" stop-color="#0f0f0f"/>
+    </linearGradient>
+    <!-- ゴールドグラデーション（枠線） -->
+    <linearGradient id="gold-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c8aa64"/>
+      <stop offset="50%" stop-color="#f0d080"/>
+      <stop offset="100%" stop-color="#c8aa64"/>
+    </linearGradient>
+    <!-- スタジアム風オーバーレイパターン（ドット） -->
+    <pattern id="dots" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="1.5" fill="#c8aa64" opacity="0.12"/>
+    </pattern>
+    <!-- アイコン用フィルター（グロー） -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- コーナー三角アクセント用グラデーション -->
+    <linearGradient id="accent-tl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c8aa64" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#c8aa64" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="accent-br" x1="1" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#c8aa64" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#c8aa64" stop-opacity="0"/>
+    </linearGradient>
+    <style>
+      .font { font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif; letter-spacing: 0; }
+      .title { font-size: 148px; font-weight: 900; fill: #ffffff; }
+      .eng { font-size: 52px; font-weight: 900; letter-spacing: 6px; fill: #c8aa64; }
+      .sub { font-size: 50px; font-weight: 700; fill: #e8e8e8; }
+    </style>
+  </defs>
+
+  <!-- ベース背景 -->
+  <rect width="2500" height="1686" fill="url(#bg)"/>
+
+  <!-- ドット柄オーバーレイ -->
+  <rect width="2500" height="1686" fill="url(#dots)"/>
+
+  <!-- スタジアム雰囲気：左右下から光るオーバーレイ -->
+  <radialGradient id="stadium-light-left" cx="0.25" cy="0.85" r="0.6">
+    <stop offset="0%" stop-color="#3a2a00" stop-opacity="0.5"/>
+    <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+  </radialGradient>
+  <rect width="1250" height="1686" fill="url(#stadium-light-left)"/>
+  <radialGradient id="stadium-light-right" cx="0.75" cy="0.85" r="0.6">
+    <stop offset="0%" stop-color="#3a2a00" stop-opacity="0.5"/>
+    <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+  </radialGradient>
+  <rect x="1250" width="1250" height="1686" fill="url(#stadium-light-right)"/>
+
+  <!-- 仕切り線 -->
+  <line x1="1250" y1="60" x2="1250" y2="1626" stroke="#c8aa64" stroke-width="3" opacity="0.6"/>
+
+  <!-- ══════════════ 左カード（公式サイト） ══════════════ -->
+  <g>
+    <!-- カード本体 -->
+    <rect x="52" y="60" width="1146" height="1566" rx="28" fill="url(#card-left)"/>
+    <!-- ゴールドボーダー -->
+    <rect x="52" y="60" width="1146" height="1566" rx="28" fill="none" stroke="url(#gold-grad)" stroke-width="4"/>
+
+    <!-- 左上コーナートライアングルアクセント -->
+    <polygon points="52,60 420,60 52,380" fill="url(#accent-tl)" opacity="0.6"/>
+    <!-- 右下コーナートライアングルアクセント -->
+    <polygon points="1198,1626 850,1626 1198,1346" fill="url(#accent-br)" opacity="0.5"/>
+
+    <!-- スタジアム感：上部の観客席風ライン群（暗い横線） -->
+    <g opacity="0.06">
+      <rect x="52" y="60" width="1146" height="18" rx="0" fill="#c8aa64"/>
+      <rect x="52" y="100" width="1146" height="12" rx="0" fill="#c8aa64"/>
+      <rect x="52" y="134" width="1146" height="10" rx="0" fill="#c8aa64"/>
+      <rect x="52" y="164" width="1146" height="8" rx="0" fill="#c8aa64"/>
+      <rect x="52" y="190" width="1146" height="7" rx="0" fill="#c8aa64"/>
+      <rect x="52" y="214" width="1146" height="6" rx="0" fill="#c8aa64"/>
+    </g>
+
+    <!-- ゴールドアイコン：地球 + カーソル -->
+    <g filter="url(#glow)">
+      <!-- 地球の輪郭 -->
+      <circle cx="625" cy="500" r="175" fill="none" stroke="#c8aa64" stroke-width="20"/>
+      <!-- 赤道線 -->
+      <ellipse cx="625" cy="500" rx="175" ry="70" fill="none" stroke="#c8aa64" stroke-width="14"/>
+      <!-- 縦線（経線） -->
+      <line x1="625" y1="325" x2="625" y2="675" stroke="#c8aa64" stroke-width="14"/>
+      <!-- 横線（緯線）上 -->
+      <path d="M 470 430 Q 625 390 780 430" fill="none" stroke="#c8aa64" stroke-width="12"/>
+      <!-- 横線（緯線）下 -->
+      <path d="M 470 570 Q 625 610 780 570" fill="none" stroke="#c8aa64" stroke-width="12"/>
+
+      <!-- カーソルアイコン（地球の右下に重ねる） -->
+      <g transform="translate(742, 608)">
+        <!-- カーソル矢印 -->
+        <polygon points="0,-10 0,80 28,52 48,100 64,92 44,44 78,38" fill="#c8aa64" stroke="#0a0a0a" stroke-width="6" stroke-linejoin="round"/>
+      </g>
+    </g>
+
+    <!-- タイトル -->
+    <text class="font title" x="625" y="880" text-anchor="middle">公式サイト</text>
+
+    <!-- ゴールド区切り線 -->
+    <rect x="525" y="920" width="200" height="5" rx="2.5" fill="#c8aa64"/>
+
+    <!-- 英語サブタイトル -->
+    <text class="font eng" x="625" y="1020" text-anchor="middle">OFFICIAL SITE</text>
+
+    <!-- 説明テキスト -->
+    <text class="font sub" x="625" y="1440" text-anchor="middle">鹿児島レブナイズ</text>
+  </g>
+
+  <!-- ══════════════ 右カード（お問い合わせ） ══════════════ -->
+  <g>
+    <!-- カード本体 -->
+    <rect x="1302" y="60" width="1146" height="1566" rx="28" fill="url(#card-right)"/>
+    <!-- ゴールドボーダー -->
+    <rect x="1302" y="60" width="1146" height="1566" rx="28" fill="none" stroke="url(#gold-grad)" stroke-width="4"/>
+
+    <!-- 左上コーナートライアングルアクセント -->
+    <polygon points="1302,60 1670,60 1302,380" fill="url(#accent-tl)" opacity="0.6"/>
+    <!-- 右下コーナートライアングルアクセント -->
+    <polygon points="2448,1626 2100,1626 2448,1346" fill="url(#accent-br)" opacity="0.5"/>
+
+    <!-- スタジアム感：上部の観客席風ライン群 -->
+    <g opacity="0.06">
+      <rect x="1302" y="60" width="1146" height="18" rx="0" fill="#c8aa64"/>
+      <rect x="1302" y="100" width="1146" height="12" rx="0" fill="#c8aa64"/>
+      <rect x="1302" y="134" width="1146" height="10" rx="0" fill="#c8aa64"/>
+      <rect x="1302" y="164" width="1146" height="8" rx="0" fill="#c8aa64"/>
+      <rect x="1302" y="190" width="1146" height="7" rx="0" fill="#c8aa64"/>
+      <rect x="1302" y="214" width="1146" height="6" rx="0" fill="#c8aa64"/>
+    </g>
+
+    <!-- ゴールドアイコン：吹き出し（...） -->
+    <g filter="url(#glow)">
+      <!-- 吹き出し本体：角丸矩形（中心=1875、幅700、高さ350） -->
+      <rect x="1525" y="300" width="700" height="340" rx="60" ry="60"
+            fill="none" stroke="#c8aa64" stroke-width="20"/>
+      <!-- 吹き出しのしっぽ（左下向き） -->
+      <polygon points="1620,640 1570,730 1760,640"
+               fill="#c8aa64" stroke="#c8aa64" stroke-width="2" stroke-linejoin="round"/>
+      <!-- しっぽ付け根をカバー（背景色で隙間埋め） -->
+      <rect x="1575" y="626" width="190" height="20" fill="#1c1c1c"/>
+      <!-- ドット3つ（中心1875に均等配置） -->
+      <circle cx="1710" cy="475" r="36" fill="#c8aa64"/>
+      <circle cx="1875" cy="475" r="36" fill="#c8aa64"/>
+      <circle cx="2040" cy="475" r="36" fill="#c8aa64"/>
+    </g>
+
+    <!-- タイトル -->
+    <text class="font title" x="1875" y="880" text-anchor="middle">お問い合わせ</text>
+
+    <!-- ゴールド区切り線 -->
+    <rect x="1775" y="920" width="200" height="5" rx="2.5" fill="#c8aa64"/>
+
+    <!-- 英語サブタイトル -->
+    <text class="font eng" x="1875" y="1020" text-anchor="middle">CONTACT</text>
+
+    <!-- 説明テキスト -->
+    <text class="font sub" x="1875" y="1440" text-anchor="middle">ご質問・ご相談はこちら</text>
+  </g>
+</svg>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="843" viewBox="0 0 2500 843">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#16162a"/>
+      <stop offset="100%" stop-color="#111126"/>
+    </linearGradient>
+    <style>
+      .font { font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif; letter-spacing: 0; }
+    </style>
+  </defs>
+  <rect width="2500" height="843" fill="url(#bg)"/>
+  <rect width="2500" height="8" fill="#c8aa64"/>
+  <line x1="1250" y1="42" x2="1250" y2="801" stroke="#c8aa64" stroke-width="3" opacity="0.45"/>
+  <g>
+    <rect x="38" y="34" width="1174" height="775" rx="18" fill="#22223d" stroke="#403a32" stroke-width="2"/>
+    <g transform="translate(285 330)" stroke="#d4b86f" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M -62 -8 L 0 -68 L 62 -8"/>
+      <path d="M -46 -8 L -46 66 L 46 66 L 46 -8"/>
+      <path d="M -12 66 L -12 20 L 15 20 L 15 66"/>
+    </g>
+    <text class="font" x="790" y="330" text-anchor="middle" font-size="86" font-weight="900" fill="#ffffff">公式サイト</text>
+    <rect x="690" y="390" width="200" height="5" rx="2.5" fill="#c8aa64"/>
+    <text class="font" x="790" y="465" text-anchor="middle" font-size="34" font-weight="900" fill="#d4b86f">OFFICIAL SITE</text>
+    <text class="font" x="790" y="650" text-anchor="middle" font-size="34" font-weight="700" fill="#ffffff" opacity="0.9">鹿児島レブナイズ</text>
+  </g>
+  <g>
+    <rect x="1288" y="34" width="1174" height="775" rx="18" fill="#22223d" stroke="#403a32" stroke-width="2"/>
+    <g transform="translate(1535 330)" stroke="#d4b86f" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M -74 -52 H 74 V 48 H -12 L -48 80 V 48 H -74 Z"/>
+      <path d="M -40 -12 H 42"/>
+      <path d="M -40 22 H 26"/>
+    </g>
+    <text class="font" x="2040" y="330" text-anchor="middle" font-size="78" font-weight="900" fill="#ffffff">お問い合わせ</text>
+    <rect x="1940" y="390" width="200" height="5" rx="2.5" fill="#c8aa64"/>
+    <text class="font" x="2040" y="465" text-anchor="middle" font-size="34" font-weight="900" fill="#d4b86f">CONTACT</text>
+    <text class="font" x="2040" y="650" text-anchor="middle" font-size="34" font-weight="700" fill="#ffffff" opacity="0.9">ご質問・ご相談はこちら</text>
+  </g>
+</svg>

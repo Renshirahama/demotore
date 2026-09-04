@@ -50,6 +50,8 @@ function classifyMoneyDiagnosis(data: Record<string, unknown>): {
   tagId: string;
   summary: string;
   nextAction: string;
+  ctaLabel: string;
+  ctaText: string;
 } {
   const purpose = asStringValue(data.purpose);
   const experience = asStringValue(data.experience);
@@ -58,8 +60,7 @@ function classifyMoneyDiagnosis(data: Record<string, unknown>): {
   if (
     purpose.includes('AI研修') ||
     pain.includes('AI人材') ||
-    pain.includes('開発人材') ||
-    experience.includes('課題はあるが未整理')
+    pain.includes('開発人材')
   ) {
     return {
       type: 'C',
@@ -69,6 +70,8 @@ function classifyMoneyDiagnosis(data: Record<string, unknown>): {
         'AI活用を一部の担当者だけで終わらせず、現場で使える状態にする支援が向いています。研修、運用ルール、伴走支援をセットで整理すると進めやすい状態です。',
       nextAction:
         'まずは現在の業務課題と社内体制を整理し、AI研修・定着支援の進め方を確認しましょう。',
+      ctaLabel: 'AI研修について',
+      ctaText: 'AI研修について知りたい',
     };
   }
 
@@ -85,7 +88,9 @@ function classifyMoneyDiagnosis(data: Record<string, unknown>): {
       summary:
         '課題や作りたいものが見え始めています。次は、要件整理、PoC、実装範囲、運用設計を具体化する段階です。',
       nextAction:
-        '配信で進め方を確認し、必要なら「開発相談をしたい」と送ってください。担当者がヒアリングへ進めます。',
+        '配信で進め方を確認し、必要なら「開発相談をする」と送ってください。担当者がヒアリングへ進めます。',
+      ctaLabel: '開発相談をする',
+      ctaText: '開発相談をする',
     };
   }
 
@@ -97,6 +102,8 @@ function classifyMoneyDiagnosis(data: Record<string, unknown>): {
       'AIやDXに関心はあるものの、最初に何を相談すべきかを整理する段階です。自社課題、活用領域、導入効果の見立てから始めると進めやすくなります。',
     nextAction:
       'Day1からの配信で、AI導入の考え方と相談前に整理するポイントを確認してください。',
+    ctaLabel: '問い合わせしたい',
+    ctaText: '問い合わせしたい',
   };
 }
 
@@ -143,6 +150,23 @@ function buildMoneyDiagnosisFlex(
         },
       ],
       paddingAll: '20px',
+    },
+    footer: {
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '18px',
+      contents: [
+        {
+          type: 'button',
+          style: 'primary',
+          color: diagnosis.type === 'C' ? '#059669' : diagnosis.type === 'B' ? '#dc2626' : '#2563eb',
+          action: {
+            type: 'message',
+            label: diagnosis.ctaLabel,
+            text: diagnosis.ctaText,
+          },
+        },
+      ],
     },
   };
 }
@@ -730,10 +754,8 @@ forms.post('/api/forms/:id/submit', async (c) => {
       // Send confirmation message with submitted data back to user
       sideEffects.push(
         (async () => {
-          console.log('Form reply: starting for friendId', friendId);
           const friend = await getFriendById(db, friendId!);
-          if (!friend?.line_user_id) { console.log('Form reply: no line_user_id'); return; }
-          console.log('Form reply: sending to', friend.line_user_id);
+          if (!friend?.line_user_id) return;
           const { LineClient } = await import('@line-crm/line-sdk');
           // Resolve access token from friend's account (multi-account support)
           let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
