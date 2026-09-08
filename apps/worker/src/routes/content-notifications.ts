@@ -350,20 +350,22 @@ async function fetchRebniseRssEntries(): Promise<RssEntry[]> {
   }
 
   const xml = await response.text();
-  return parseAtomEntries(xml).slice(0, 20);
+  return parseRebniseFeedEntries(xml).slice(0, 20);
 }
 
-function parseAtomEntries(xml: string): RssEntry[] {
+export function parseRebniseFeedEntries(xml: string): RssEntry[] {
   const entries: RssEntry[] = [];
-  const entryPattern = /<entry\b[\s\S]*?<\/entry>/gi;
-  const blocks = xml.match(entryPattern) ?? [];
+  const atomBlocks = xml.match(/<entry\b[\s\S]*?<\/entry>/gi) ?? [];
+  const rssBlocks = xml.match(/<item\b[\s\S]*?<\/item>/gi) ?? [];
 
-  for (const block of blocks) {
+  for (const block of [...atomBlocks, ...rssBlocks]) {
     const id = xmlText(block, 'id');
     const title = stripHtml(xmlText(block, 'title'));
-    const summary = stripHtml(xmlText(block, 'summary') || xmlText(block, 'content')).slice(0, 700);
-    const updatedAt = xmlText(block, 'updated') || xmlText(block, 'published');
-    const link = linkHref(block) || id;
+    const summary = stripHtml(
+      xmlText(block, 'summary') || xmlText(block, 'content') || xmlText(block, 'description'),
+    ).slice(0, 700);
+    const updatedAt = xmlText(block, 'updated') || xmlText(block, 'published') || xmlText(block, 'date');
+    const link = linkHref(block) || xmlText(block, 'link') || id;
     if (!title || !link) continue;
     entries.push({ id: id || link, title, summary, url: link, updatedAt });
   }
@@ -372,7 +374,7 @@ function parseAtomEntries(xml: string): RssEntry[] {
 }
 
 function xmlText(block: string, tag: string): string {
-  const pattern = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
+  const pattern = new RegExp(`<(?:(?:[A-Za-z_][\\w.-]*):)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:[A-Za-z_][\\w.-]*:)?${tag}>`, 'i');
   const match = block.match(pattern);
   return match ? decodeEntities(stripCdata(match[1]).trim()) : '';
 }
