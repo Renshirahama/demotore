@@ -12,10 +12,22 @@ export interface FriendTag {
   assigned_at: string;
 }
 
-export async function getTags(db: D1Database): Promise<Tag[]> {
-  const result = await db
-    .prepare(`SELECT * FROM tags ORDER BY name ASC`)
-    .all<Tag>();
+export async function getTags(db: D1Database, lineAccountId?: string): Promise<Tag[]> {
+  const result = lineAccountId
+    ? await db
+      .prepare(
+        `SELECT DISTINCT t.*
+         FROM tags t
+         INNER JOIN friend_tags ft ON ft.tag_id = t.id
+         INNER JOIN friends f ON f.id = ft.friend_id
+         WHERE f.line_account_id = ?
+         ORDER BY t.name ASC`,
+      )
+      .bind(lineAccountId)
+      .all<Tag>()
+    : await db
+      .prepare(`SELECT * FROM tags ORDER BY name ASC`)
+      .all<Tag>();
   return result.results;
 }
 

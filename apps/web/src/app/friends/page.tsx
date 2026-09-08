@@ -50,12 +50,12 @@ export default function FriendsPage() {
 
   const loadTags = useCallback(async () => {
     try {
-      const res = await api.tags.list()
+      const res = await api.tags.list({ accountId: selectedAccountId || undefined })
       if (res.success) setAllTags(res.data)
     } catch {
       // Non-blocking — tags used for filter
     }
-  }, [])
+  }, [selectedAccountId])
 
   const loadFriends = useCallback(async () => {
     setLoading(true)
@@ -96,6 +96,7 @@ export default function FriendsPage() {
   // new `page=1` request and overwrites the correct page-1 rows.
   useEffect(() => {
     setPage(1)
+    setSelectedTagId('')
   }, [selectedAccountId])
 
   useEffect(() => {

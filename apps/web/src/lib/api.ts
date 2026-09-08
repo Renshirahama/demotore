@@ -204,8 +204,12 @@ export const api = {
       ),
   },
   tags: {
-    list: () =>
-      fetchApi<ApiResponse<Tag[]>>('/api/tags'),
+    list: (params?: { accountId?: string }) => {
+      const query = params?.accountId
+        ? `?lineAccountId=${encodeURIComponent(params.accountId)}`
+        : ''
+      return fetchApi<ApiResponse<Tag[]>>(`/api/tags${query}`)
+    },
     create: (data: { name: string; color: string }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {
         method: 'POST',

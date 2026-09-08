@@ -14,10 +14,11 @@ function serializeTag(row: DbTag) {
   };
 }
 
-// GET /api/tags - list all tags
+// GET /api/tags - list tags, optionally scoped to a LINE account's friends
 tags.get('/api/tags', async (c) => {
   try {
-    const items = await getTags(c.env.DB);
+    const lineAccountId = c.req.query('lineAccountId')?.trim() || undefined;
+    const items = await getTags(c.env.DB, lineAccountId);
     return c.json({ success: true, data: items.map(serializeTag) });
   } catch (err) {
     console.error('GET /api/tags error:', err);
